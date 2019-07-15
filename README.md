@@ -1,8 +1,18 @@
 # Aggregating all non-premium, intermediate tutorials on Real Python
 
-## Goal
-Create a collection of URLs to tutorials on [Real Python](https://realpython.com)
+## Goals
+* Create a collection of URLs to tutorials on [Real Python](https://realpython.com)
 that are tagged as `intermediate` but not marked for premium users.
+
+* Write a markdown file which contains the title, URL, and introductory text to
+each of the extracted tutorials. For example,
+
+```markdown
+## [Title of tutorial](url)
+<p>In this tutorial, we will learn about...</p>
+```
+
+* Sort the tutorials by level of engagement (number of comments)
 
 ## Strategy
 1. Use the `requests` library to crawl across all pages in the [intermediate](https://realypython.com/tutorials/intermediate) category.
