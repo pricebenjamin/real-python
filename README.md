@@ -12,6 +12,10 @@ each of the extracted tutorials. For example,
 <p>In this tutorial, we will learn about...</p>
 ```
 
+* Add support for fetching any tutorial topic.
+
+* Add support for fetching the latest list tutorial topics.
+
 * Sort the tutorials by level of engagement (number of comments)
 
 ## Strategy
