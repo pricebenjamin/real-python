@@ -14,8 +14,14 @@ class Error(Exception):
 class TopicNotFound(Exception):
     """The requested topic was not found. Is the cache up-to-date?"""
 
+class ExtractTutorialError(Error):
+    """Base-class for errors relating to the extraction of tutorials."""
+
+class MissingCardText(ExtractTutorialError):
+    """The card provided is missing a paragraph with class 'card-text'."""
+
 class ExtractIntroductionError(Error):
-    """Base-class for errors encountered when extracting introductions."""
+    """Base-class for errors relating to extracting introductions."""
 
 class MissingH2(ExtractIntroductionError):
     """The article provided does not contain an <h2> element."""
@@ -136,9 +142,7 @@ def is_premium(card):
     card_text = card.find("p", {"class": "card-text"})
 
     if card_text is None:
-        print("Error while checking if `div` contains a premium tutorial.")
-        print("    Unable to find paragraph with {'class': 'card-text'}.")
-        return None
+        raise MissingCardText()
 
     result = card_text.find("a", {"href": "/account/join/"})
     # Note: this assumes /account/join/ will always be the first anchor
