@@ -9,6 +9,21 @@ url['tutorials'] = url['root'] + '/tutorials/intermediate'
 cache_filename = 'cached_responses.pickle'
 cached_responses = {}
 
+class Error(Exception):
+    """Base-class for all exceptions raised by this module."""
+
+class TopicNotFound(Exception):
+    """The requested topic was not found. Is the cache up-to-date?"""
+
+class ExtractIntroductionError(Error):
+    """Base-class for errors encountered when extracting introductions."""
+
+class MissingH2(ExtractIntroductionError):
+    """The article provided does not contain an <h2> element."""
+
+class UnexpectedNavigableString(ExtractIntroductionError):
+    """The navigable string provided does not match what was expected."""
+
 def load_cached_responses(filename):
     global cached_responses
     try:
@@ -43,6 +58,10 @@ def get_response(url):
             print(f"    url: {url}")
             print(f"    status: {response.status_code}")
             return None
+            # TODO(ben): Should this raise an exception instead?
+
+def get_soup(response):
+    return bs4.BeautifulSoup(response.content, 'html5lib')
 
 def extract_tutorials(soup, root_url=""):
     premium_tutorials = {}
@@ -72,15 +91,18 @@ def extract_introduction(article_url):
     response = get_response(article_url)
 
     if response is not None:
-        soup = bs4.BeautifulSoup(response.content, 'html5lib')
+        soup = get_soup(response)
         article_body = soup.find('div', {'class': 'article-body'})
+
+        if article_body.find('h2') == None:
+            raise MissingH2()
 
         # Introductory text is nested between divs at the beginning of the body.
         # As such, we begin by skipping over blank lines and divs:
         children = article_body.children
         while True:
             child = next(children)
-            if child == '\n' or child.name == 'div':
+            if isinstance(child, bs4.element.NavigableString) or child.name == 'div':
                 continue
             else: break
 
@@ -102,6 +124,10 @@ def extract_introduction(article_url):
 def format_introduction(tag_list):
     intro = []
     for tag in tag_list:
+        if isinstance(tag, bs4.element.NavigableString):
+            if tag != '\n':
+                raise UnexpectedNavigableString(f"tag == {tag}")
+            else: continue
         for line in tag.decode().splitlines():
             intro.append(line)
 
@@ -133,17 +159,22 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
             if not is_premium:
                 # Write the introduction to the file
                 lines.append('\n')
-                intro = extract_introduction(url)
-                for line in format_introduction(intro):
-                    lines.append('> ' + line + '\n')
-                lines.append('\n')
+                try:
+                    intro = extract_introduction(url)
+                except MissingH2:
+                    lines.append('<p>No introduction available.</p>')
+                else:
+                    for line in format_introduction(intro):
+                        lines.append('> ' + line + '\n')
+                finally:
+                    lines.append('\n')
 
         file.writelines(lines)
 
 def fetch_tutorial_topics():
     global url
     response = get_response(url['root'])
-    soup = bs4.BeautifulSoup(response.content, 'html5lib')
+    soup = get_soup(response)
     topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
     topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
 
@@ -154,60 +185,73 @@ def fetch_tutorial_topics():
 
     return topics
 
+def scrape_tutorial_topics(topic_list='all'):
+    global url
+    available_topics = fetch_tutorial_topics()
+
+    if topic_list == 'all':
+        topic_list = available_topics.keys()
+    
+    for topic in topic_list:
+        if topic not in available_topics:
+            raise TopicNotFound()
+
+        print(f"Crawling `{topic}` tutorial pages...")
+
+        premium = {}
+        non_premium = {}
+
+        # Iterate through all available pages until we cannot find new tutorials
+        for i in count(start = 1):
+            link = available_topics[topic] + f"page/{i}/"
+            response = get_response(link)
+
+            if response is not None: # TODO(ben): exception may be raised in the future
+                soup = get_soup(response)
+                p, np = extract_tutorials(soup, root_url=url['root'])
+
+                if found_new_tutorials(premium, p) or found_new_tutorials(non_premium, np):
+                    print(f"    # Premium tutorials:     {len(premium):3d}")
+                    print(f"    # Non-Premium tutorials: {len(non_premium):3d}")
+                    continue
+                else:
+                    print("    No new tutorials found.")
+                    break
+            else:
+                break
+
+        print(f"Saving `{topic}` URLs into markdown...")
+
+        write_to_markdown(
+            premium, 
+            filename=f"{topic}_premium_tutorials.md",
+            title=f"# {topic}, premium tutorials from Real Python\n",
+            is_premium=True)
+
+        write_to_markdown(
+            non_premium,
+            filename=f"{topic}_non_premium_tutorials.md",
+            title=f"# {topic}, non-premium tutorials from Real Python\n",
+            is_premium=False)
+
+def found_new_tutorials(original: dict, to_append: dict):
+    """Check if all keys of `to_append` are in `original`. If not, update original."""
+    difference = to_append.keys() - original.keys() # Set difference
+    if difference != set():
+        original.update(to_append)
+        return True
+    else:
+        return False
     
 def main():
     load_cached_responses(cache_filename)
 
-    # Initialize empty dictionaries
-    premium = {}
-    non_premium = {}
-
-    print("Crawling tutorial pages...")
-
-    for i in count(start=1):
-        link = url['tutorials'] + f"/page/{i}/"
-        response = get_response(link)
-
-        if response is not None:
-            soup = bs4.BeautifulSoup(response.content, 'html5lib')
-            p, np = extract_tutorials(soup, root_url=url['root'])
-
-            # Count initial number of tutorials
-            initial_size = dict(
-                p=len(premium),
-                np=len(non_premium))
-
-            premium.update(p)
-            non_premium.update(np)
-
-            # Check if new tutorials were found
-            if len(premium) == initial_size['p'] \
-                and len(non_premium) == initial_size['np']:
-                print("    No new tutorials found.")
-                break
-            else:
-                print(f"    # Premium tutorials:     {len(premium):3d}")
-                print(f"    # Non-Premium tutorials: {len(non_premium):3d}")
-
-        else:
-            break
-
-    print("Saving URLs into markdown...")
-
-    write_to_markdown(
-        premium, 
-        filename="premium_tutorials.md",
-        title="# Intermediate, premium tutorials from Real Python\n",
-        is_premium=True)
-
-    write_to_markdown(
-        non_premium,
-        filename="non_premium_tutorials.md",
-        title="# Intermediate, non-premium tutorials from Real Python\n",
-        is_premium=False)
-
-    print("Saving cached responses...")
-    save_cached_responses(cache_filename)
+    # TODO(ben): accept command line arguments to specify topics
+    try:
+        scrape_tutorial_topics()
+    finally:
+        print("Saving cached responses...")
+        save_cached_responses(cache_filename)
 
 if __name__ == "__main__":
     main()
