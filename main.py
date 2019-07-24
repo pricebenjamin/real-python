@@ -139,6 +139,21 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
                 lines.append('\n')
 
         file.writelines(lines)
+
+def fetch_tutorial_topics():
+    global url
+    response = get_response(url['root'])
+    soup = bs4.BeautifulSoup(response.content, 'html5lib')
+    topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
+    topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
+
+    topics = {
+        anchor.text: url['root'] + anchor.attrs['href'] 
+        for anchor in topic_anchors
+    }
+
+    return topics
+
     
 def main():
     load_cached_responses(cache_filename)
