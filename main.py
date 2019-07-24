@@ -3,11 +3,10 @@ import bs4
 import pickle
 from itertools import count
 
-url = {'root': 'https://realpython.com'}
-url['tutorials'] = url['root'] + '/tutorials/intermediate'
+ROOT_URL = 'https://realpython.com'
 
-cache_filename = 'cached_responses.pickle'
-cached_responses = {}
+CACHE_FILENAME = 'cached_responses.pickle'
+CACHED_RESPONSES = {}
 
 class Error(Exception):
     """Base-class for all exceptions raised by this module."""
@@ -25,23 +24,23 @@ class UnexpectedNavigableString(ExtractIntroductionError):
     """The navigable string provided does not match what was expected."""
 
 def load_cached_responses(filename):
-    global cached_responses
+    global CACHED_RESPONSES
     try:
         with open(filename, 'rb') as f:
-            cached_responses.update(pickle.load(f))
+            CACHED_RESPONSES.update(pickle.load(f))
     except IOError as e:
         print(e)
 
 def save_cached_responses(filename):
-    global cached_responses
+    global CACHED_RESPONSES
     with open(filename, 'wb') as f:
-        pickle.dump(cached_responses, f)
+        pickle.dump(CACHED_RESPONSES, f)
 
 def get_response(url):
-    global cached_responses
-    if url in cached_responses:
+    global CACHED_RESPONSES
+    if url in CACHED_RESPONSES:
         print(f"Loading cached response: {url}")
-        response = cached_responses[url]
+        response = CACHED_RESPONSES[url]
         return response
     else:
         with requests.Session() as session:
@@ -50,7 +49,7 @@ def get_response(url):
         if response.status_code == 200:
             print(f"Successful get: {url}")
             print(f"    content length: {len(response.content)}")
-            cached_responses[url] = response
+            CACHED_RESPONSES[url] = response
             print(f"    cached: True")
             return response
         else:
@@ -172,21 +171,19 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
         file.writelines(lines)
 
 def fetch_tutorial_topics():
-    global url
-    response = get_response(url['root'])
+    response = get_response(ROOT_URL)
     soup = get_soup(response)
     topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
     topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
 
     topics = {
-        anchor.text: url['root'] + anchor.attrs['href'] 
+        anchor.text: ROOT_URL + anchor.attrs['href'] 
         for anchor in topic_anchors
     }
 
     return topics
 
 def scrape_tutorial_topics(topic_list='all'):
-    global url
     available_topics = fetch_tutorial_topics()
 
     if topic_list == 'all':
@@ -208,7 +205,7 @@ def scrape_tutorial_topics(topic_list='all'):
 
             if response is not None: # TODO(ben): exception may be raised in the future
                 soup = get_soup(response)
-                p, np = extract_tutorials(soup, root_url=url['root'])
+                p, np = extract_tutorials(soup, root_url=ROOT_URL)
 
                 if found_new_tutorials(premium, p) or found_new_tutorials(non_premium, np):
                     print(f"    # Premium tutorials:     {len(premium):3d}")
@@ -244,14 +241,14 @@ def found_new_tutorials(original: dict, to_append: dict):
         return False
     
 def main():
-    load_cached_responses(cache_filename)
+    load_cached_responses(CACHE_FILENAME)
 
     # TODO(ben): accept command line arguments to specify topics
     try:
         scrape_tutorial_topics()
     finally:
         print("Saving cached responses...")
-        save_cached_responses(cache_filename)
+        save_cached_responses(CACHE_FILENAME)
 
 if __name__ == "__main__":
     main()
