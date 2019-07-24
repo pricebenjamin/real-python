@@ -33,9 +33,11 @@ def load_cached_responses(filename):
     global CACHED_RESPONSES
     try:
         with open(filename, 'rb') as f:
-            CACHED_RESPONSES.update(pickle.load(f))
+            prev_cache = pickle.load(f)
     except IOError as e:
-        print(e)
+        print(f"Cache not loaded. ({e.__class__!r}: {e})")
+    else:
+        CACHED_RESPONSES.update(prev_cache)
 
 def save_cached_responses(filename):
     global CACHED_RESPONSES
