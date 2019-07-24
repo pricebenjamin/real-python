@@ -14,7 +14,7 @@ each of the extracted tutorials. For example,
 
 * Add support for fetching any tutorial topic.
 
-* Add support for fetching the latest list tutorial topics.
+* Add support for fetching the latest list of tutorial topics.
 
 * Sort the tutorials by level of engagement (number of comments)
 
