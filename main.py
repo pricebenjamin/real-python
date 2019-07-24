@@ -162,7 +162,7 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
                 try:
                     intro = extract_introduction(url)
                 except MissingH2:
-                    lines.append('<p>No introduction available.</p>')
+                    lines.append('> <p>No introduction available.</p>\n')
                 else:
                     for line in format_introduction(intro):
                         lines.append('> ' + line + '\n')
