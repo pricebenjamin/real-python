@@ -1,0 +1,3 @@
+generated_markdown/
+__pycache__/
+*.pickle
