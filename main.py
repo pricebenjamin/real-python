@@ -30,6 +30,16 @@ class UnexpectedNavigableString(ExtractIntroductionError):
     """The navigable string provided does not match what was expected."""
 
 def load_cached_responses(filename):
+    """Populate CACHED_RESPONSES by reading from a file.
+
+    Args:
+        filename (str): name of the file to unpic
+
+    Returns:
+        None
+
+    Modifies:
+        CACHED_RESPONSES (dict[url, requests.response])"""
     global CACHED_RESPONSES
     try:
         with open(filename, 'rb') as f:
