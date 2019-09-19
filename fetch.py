@@ -1,6 +1,8 @@
 import requests
 import bs4
 import pickle
+import os
+import time
 from itertools import count
 
 ROOT_URL = 'https://realpython.com'
@@ -29,6 +31,21 @@ class MissingH2(ExtractIntroductionError):
 class UnexpectedNavigableString(ExtractIntroductionError):
     """The navigable string provided does not match what was expected."""
 
+class GetResponseError(Error):
+    """Base-class for errors raised by the get_response function."""
+
+class UnsuccessfulGet(GetResponseError):
+    """Received an unexpected reponse code."""
+
+def sleep_for(count):
+    for i in range(count, 0, -1):
+        msg = f"    Sleeping for {i} more second{'s' if i != 1 else ''}..."
+        msg = f"{msg: <40}"
+        # https://docs.python.org/3/library/string.html#format-examples
+        print(msg, end='\r')
+        time.sleep(1)
+    print()
+
 def load_cached_responses(filename):
     """Populate CACHED_RESPONSES by reading from a file.
 
@@ -45,7 +62,7 @@ def load_cached_responses(filename):
         with open(filename, 'rb') as f:
             prev_cache = pickle.load(f)
     except IOError as e:
-        print(f"Cache not loaded. ({e.__class__!r}: {e})")
+        print(f"Cache not loaded. ({e})")
     else:
         CACHED_RESPONSES.update(prev_cache)
 
@@ -70,12 +87,20 @@ def get_response(url):
             CACHED_RESPONSES[url] = response
             print(f"    cached: True")
             return response
+        elif response.status_code == 429:
+            print("Received status code 429: Too many requests.")
+            retry_after = response.headers.get('Retry-After', '')
+            try:
+                count = int(retry_after)
+            except ValueError:
+                count = 10
+            sleep_for(count) # TODO: implement more robust rate-limiting
+            return get_response(url)
         else:
             print("Error: unsuccessful get")
             print(f"    url: {url}")
             print(f"    status: {response.status_code}")
-            return None
-            # TODO(ben): Should this raise an exception instead?
+            raise UnsuccessfulGet(url)
 
 def get_soup(response):
     return bs4.BeautifulSoup(response.content, 'html5lib')
@@ -105,38 +130,38 @@ def extract_card_info(card):
     return title, url
 
 def extract_introduction(article_url):
-    response = get_response(article_url)
+    try:
+        response = get_response(article_url)
+    except GetReponseError as e:
+        raise ExtractIntroductionError() from e
 
-    if response is not None:
-        soup = get_soup(response)
-        article_body = soup.find('div', {'class': 'article-body'})
+    soup = get_soup(response)
+    article_body = soup.find('div', {'class': 'article-body'})
 
-        if article_body.find('h2') == None:
-            raise MissingH2()
+    if article_body.find('h2') == None:
+        raise MissingH2()
 
-        # Introductory text is nested between divs at the beginning of the body.
-        # As such, we begin by skipping over blank lines and divs:
-        children = article_body.children
-        while True:
-            child = next(children)
-            if isinstance(child, bs4.element.NavigableString) or child.name == 'div':
-                continue
-            else: break
+    # Introductory text is nested between divs at the beginning of the body.
+    # As such, we begin by skipping over blank lines and divs:
+    children = article_body.children
+    while True:
+        child = next(children)
+        if isinstance(child, bs4.element.NavigableString) or child.name == 'div':
+            continue
+        else: break
 
-        # Store all remaining non-div elements until we hit the next div
-        intro = [child]
-        while True:
-            child = next(children)
-            if child == '\n':
-                continue
-            elif child.name == 'div' or child.name == 'h2':
-                break
-            else:
-                intro.append(child)
+    # Store all remaining non-div elements until we hit the next div
+    intro = [child]
+    while True:
+        child = next(children)
+        if child == '\n':
+            continue
+        elif child.name == 'div' or child.name == 'h2':
+            break
+        else:
+            intro.append(child)
 
-        return intro
-    else:
-        return None
+    return intro
 
 def format_introduction(tag_list):
     intro = []
@@ -166,7 +191,11 @@ def is_premium(card):
         return True    # Found hyperlink to /account/join/
 
 def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premium=False):
-    with open(filename, 'w') as file:
+    subdirectory = 'generated_markdown'
+    if not os.path.exists(subdirectory):
+        os.mkdir(subdirectory)
+    path = os.path.join(subdirectory, filename)
+    with open(path, 'w') as file:
         lines = [title, '\n']
         
         for title, url in url_dict.items():
@@ -178,6 +207,12 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
                     intro = extract_introduction(url)
                 except MissingH2:
                     lines.append('> <p>No introduction available.</p>\n')
+                except ExtractIntroductionError as e:
+                    print("Unable to extract introduction for")
+                    print(f"    title: {title}")
+                    print(f"    url: {url}")
+                    print(f"    error: {e}")
+                    continue
                 else:
                     for line in format_introduction(intro):
                         lines.append('> ' + line + '\n')
