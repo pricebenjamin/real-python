@@ -44,6 +44,8 @@ text to each of the extracted tutorials. For example,
 
 - [X] Add support for fetching a particular topic.
 
+- [ ] Fetch author name, publication date, and number of comments, if available
+
 - [ ] Accept a list of topic strings as command line arguments.
 
 - [ ] Sort the tutorials by level of engagement (e.g., number of comments)
