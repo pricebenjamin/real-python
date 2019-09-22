@@ -253,20 +253,20 @@ def scrape_tutorial_topics(topic_list='all'):
         # Iterate through all available pages until we cannot find new tutorials
         for i in count(start = 1):
             link = available_topics[topic] + f"page/{i}/"
-            response = get_response(link)
+            try:
+                response = get_response(link)
+            except UnsuccessfulGet:
+                break
 
-            if response is not None: # TODO(ben): exception may be raised in the future
-                soup = get_soup(response)
-                p, np = extract_tutorials(soup, root_url=ROOT_URL)
-
-                if found_new_tutorials(premium, p) or found_new_tutorials(non_premium, np):
-                    print(f"    # Premium tutorials:     {len(premium):3d}")
-                    print(f"    # Non-Premium tutorials: {len(non_premium):3d}")
-                    continue
-                else:
-                    print("    No new tutorials found.")
-                    break
+            soup = get_soup(response)
+            p, np = extract_tutorials(soup, root_url=ROOT_URL)
+            
+            if found_new_tutorials(premium, p) or found_new_tutorials(non_premium, np):
+                print(f"    # Premium tutorials:     {len(premium):3d}")
+                print(f"    # Non-Premium tutorials: {len(non_premium):3d}")
+                continue
             else:
+                print("    No new tutorials found.")
                 break
 
         print(f"Saving `{topic}` URLs into markdown...")
