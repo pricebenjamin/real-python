@@ -242,7 +242,8 @@ def scrape_tutorial_topics(topic_list='all'):
     
     for topic in topic_list:
         if topic not in available_topics:
-            raise TopicNotFound(f"{topic}")
+            msg = f"{topic} not in {set(available_topoics.keys())!r}"
+            raise TopicNotFound(msg)
 
         print(f"Crawling `{topic}` tutorial pages...")
 
