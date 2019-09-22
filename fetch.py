@@ -77,30 +77,28 @@ def get_response(url):
         print(f"Loading cached response: {url}")
         response = CACHED_RESPONSES[url]
         return response
+    with requests.Session() as session:
+        response = session.get(url)
+    if response.status_code == 200:
+        print(f"Successful get: {url}")
+        print(f"    content length: {len(response.content)}")
+        CACHED_RESPONSES[url] = response
+        print(f"    cached: True")
+        return response
+    elif response.status_code == 429:
+        print("Received status code 429: Too many requests.")
+        retry_after = response.headers.get('Retry-After', '')
+        try:
+            count = int(retry_after)
+        except ValueError:
+            count = 10
+        sleep_for(count) # TODO: implement more robust rate-limiting
+        return get_response(url)
     else:
-        with requests.Session() as session:
-            response = session.get(url)
-
-        if response.status_code == 200:
-            print(f"Successful get: {url}")
-            print(f"    content length: {len(response.content)}")
-            CACHED_RESPONSES[url] = response
-            print(f"    cached: True")
-            return response
-        elif response.status_code == 429:
-            print("Received status code 429: Too many requests.")
-            retry_after = response.headers.get('Retry-After', '')
-            try:
-                count = int(retry_after)
-            except ValueError:
-                count = 10
-            sleep_for(count) # TODO: implement more robust rate-limiting
-            return get_response(url)
-        else:
-            print("Error: unsuccessful get")
-            print(f"    url: {url}")
-            print(f"    status: {response.status_code}")
-            raise UnsuccessfulGet(url)
+        print("Error: unsuccessful get")
+        print(f"    url: {url}")
+        print(f"    status: {response.status_code}")
+        raise UnsuccessfulGet(url)
 
 def get_soup(response):
     return bs4.BeautifulSoup(response.content, 'html5lib')
