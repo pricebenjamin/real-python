@@ -222,6 +222,7 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
         file.writelines(lines)
 
 def fetch_tutorial_topics():
+    print("Fetching list of available tutorial topics...")
     response = get_response(ROOT_URL)
     soup = get_soup(response)
     topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
@@ -242,7 +243,8 @@ def scrape_tutorial_topics(topic_list='all'):
     
     for topic in topic_list:
         if topic not in available_topics:
-            msg = f"{topic} not in {set(available_topoics.keys())!r}"
+            msg = (f"'{topic}' is not in the list of available topics\n\n"
+                   f"Available topics include {set(available_topics.keys())!r}")
             raise TopicNotFound(msg)
 
         print(f"Crawling `{topic}` tutorial pages...")
