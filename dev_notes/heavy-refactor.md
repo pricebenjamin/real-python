@@ -64,8 +64,46 @@ def main():
 
 Considering...
 ```python
-with ResponseCache(CACHE_FILENAME) as cache:
-    scrape_tutorial_topics(cache)
+with Scraper() as scraper:
+    scraper.scrape_tutorial_topics('all')
+```
+
+where the Scraper class looks something like...
+```python
+class Scraper:
+    __init__(self, cache_filename='cached_responses.pickle'):
+        self.cache = {}
+        self.cache_filename = cache_filename
+        self.sess = None
+
+    def __enter__(self):
+        try:
+            with open(self.cache_filename, 'r') as f:
+                prev_cache = pickle.load(f)
+        except IOError as e:
+            print(f"Cache not loaded. ({e})")
+        else:
+            self.cache.update(prev_cache)
+        self.sess = requests.Session()
+        return self
+
+    def __exit__(self):
+        with open(self.cache_filename, 'w') as f:
+            pickle.dump(self.cache, f)
+        self.sess.close()
+
+    def get_response(self, url):
+        if url in self.cache:
+            return self.cache[url]
+        response = self.sess.get(url)
+        
+        # Check that response is good or raise error
+        ...
+
+        self.cache[url] = response
+        return response
+
+    # All the other methods...
 ```
 
 Try to find examples of context managers serving as a cache.
