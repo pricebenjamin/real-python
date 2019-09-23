@@ -246,6 +246,33 @@ def generate_count_query_url(article_url):
     disqus_url = 'https://realpython.disqus.com/count-data.js'
     return disqus_url + '?1=' + requests.utils.quote(article_url, safe='')
 
+def generate_metadata_string_and_append_links(soup, article_url, links=None) -> str:
+    author, date, tags, comments = extract_metadata(soup, article_url)
+    if author and tags and comments:
+        tag_links = ', '.join([
+            f"[{tag.name}][{tag.link.id}]" for tag in tags])
+
+        comment_link = (
+            f"[{comments.count} comments]"
+            if comments.count != 1 else "[1 comment]")
+        comment_link += f"[{comments.link.id}]"
+
+        metadata_string = (
+            f"by [{author.name}][{author.link.id}] "
+            + (f"on {date.strftime('%a, %d %b %Y')} " if date else "")
+            + f"with tags: {tag_links} "
+            + f"({comment_link})")
+
+        if links:
+            links.append(author.link)
+            links.extend([tag.link for tag in tags])
+            links.append(comments.link)
+        return metadata_string
+    else:
+        return None
+
+
+
 
 # Processing
 Title, URL = NewType('Title', str), NewType('URL', str)
@@ -350,8 +377,6 @@ def extract_comment_count(disqus_response) -> int:
         raise CommentCountError(msg)
     return count
 
-metadata_cases = set()
-
 def write_to_markdown(url_dict, filename, title, is_premium) -> None:
     subdirectory = 'generated_markdown'
     if not os.path.exists(subdirectory):
@@ -363,16 +388,20 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
         for title, url in url_dict.items():
             response = get_response(url)
             soup = get_soup(response)
-            lines.append(f"### [{title}]({url})\n")
+
+            article_links = []
+            article_links.append(Link(id=next(link_counter), url=url))
+            lines.append(f"## [{title}][{article_links[0].id}]\n")
+
             if not is_premium:
-                metadata_cases.add(
-                    tuple(bool(item) for item in extract_metadata(soup, url)))
                 # Write the introduction to the file
-                lines.append('\n')
+                metadata_string = generate_metadata_string_and_append_links(soup, url, links=article_links)
+                if metadata_string:
+                    lines.append(metadata_string + '\n\n')
                 try:
                     intro = extract_introduction(soup, url)
                 except MissingH2:
-                    lines.append('> <p>No introduction available.</p>\n')
+                    lines.append('> <p>No introduction available.</p>\n\n')
                 except ExtractIntroductionError as e:
                     print("Unable to extract introduction for")
                     print(f"    title: {title}")
@@ -382,7 +411,11 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
                 else:
                     for line in format_introduction(intro):
                         lines.append('> ' + line + '\n')
+                    lines.append('\n')
                 finally:
+                    article_links.sort(key=lambda link: link.id)
+                    for link in article_links:
+                        lines.append(f"[{link.id}]: {link.url}\n")
                     lines.append('\n')
 
         file.writelines(lines)
