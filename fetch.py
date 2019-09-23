@@ -1,9 +1,16 @@
-import requests
 import bs4
-import pickle
+import itertools
 import os
+import pickle
+import requests
 import time
-from itertools import count
+
+from datetime import datetime
+from collections import namedtuple
+
+from typing import List, Union, Tuple, Dict, Optional, NewType
+from bs4.element import Tag, NavigableString
+bs4Element = Union[Tag, NavigableString]
 
 ROOT_URL = 'https://realpython.com'
 
@@ -37,15 +44,20 @@ class GetResponseError(Error):
 class UnsuccessfulGet(GetResponseError):
     """Received an unexpected reponse code."""
 
-def sleep_for(count):
-    for i in range(count, 0, -1):
-        msg = f"    Sleeping for {i} more second{'s' if i != 1 else ''}..."
-        msg = f"{msg: <40}"
-        # https://docs.python.org/3/library/string.html#format-examples
-        print(msg, end='\r')
-        time.sleep(1)
-    print()
+class MetadataError(Error):
+    """Base class for errors relating to metadata."""
 
+class MissingArticle(MetadataError):
+    """Could not find <div class="article"> tag when searching for metadata."""
+
+class MissingMetadata(MetadataError):
+    """Could not find <span class="text-muted"> tag when searching for metadata."""
+
+class UnexpectedFirstChild(MetadataError):
+    """First child of metadata tag was not NavigableString('by ')."""
+
+
+# Cache
 def load_cached_responses(filename):
     """Populate CACHED_RESPONSES by reading from a file.
 
@@ -71,6 +83,8 @@ def save_cached_responses(filename):
     with open(filename, 'wb') as f:
         pickle.dump(CACHED_RESPONSES, f)
 
+
+# Helpers   
 def get_response(url):
     global CACHED_RESPONSES
     if url in CACHED_RESPONSES:
@@ -103,31 +117,54 @@ def get_response(url):
 def get_soup(response):
     return bs4.BeautifulSoup(response.content, 'html5lib')
 
-def extract_tutorials(soup, root_url=""):
-    premium_tutorials = {}
-    non_premium_tutorials = {}
+def sleep_for(count):
+    for i in range(count, 0, -1):
+        msg = f"    Sleeping for {i} more second{'s' if i != 1 else ''}..."
+        msg = f"{msg: <40}"
+        # https://docs.python.org/3/library/string.html#format-examples
+        print(msg, end='\r')
+        time.sleep(1)
+    print()
 
-    cards = get_cards(soup)
+def fetch_tutorial_topics():
+    print("Fetching list of available tutorial topics...")
+    response = get_response(ROOT_URL)
+    soup = get_soup(response)
+    topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
+    topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
 
-    for card in cards:
-        title, url = extract_card_info(card)
-        if is_premium(card):
-            premium_tutorials[title] = root_url + url
-        else:
-            non_premium_tutorials[title] = root_url + url
+    topics = {
+        anchor.text: ROOT_URL + anchor.attrs['href'] 
+        for anchor in topic_anchors
+    }
 
-    return premium_tutorials, non_premium_tutorials
+    return topics
 
-def get_cards(soup):
+def get_cards(soup) -> List[Tag]:
     return soup.findAll("div", {"class": "card border-0"})
 
-def extract_card_info(card):
+def extract_card_info(card) -> Tuple[str, str]:
     body = card.find("div", {"class": "card-body"})
     title = body.find("h2").text
     url = body.find("a").attrs['href']
     return title, url
 
-def extract_introduction(article_url):
+def is_premium(card) -> bool:
+    card_text = card.find("p", {"class": "card-text"})
+
+    if card_text is None:
+        raise MissingCardText()
+
+    result = card_text.find("a", {"href": "/account/join/"})
+    # Note: this assumes /account/join/ will always be the first anchor
+    # within the card-text paragraph
+
+    if result is None:
+        return False   # Did not find hyperlink to /account/join/
+    else:
+        return True    # Found hyperlink to /account/join/
+
+def extract_introduction(article_url) -> List[bs4Element]:
     try:
         response = get_response(article_url)
     except GetReponseError as e:
@@ -144,7 +181,7 @@ def extract_introduction(article_url):
     children = article_body.children
     while True:
         child = next(children)
-        if isinstance(child, bs4.element.NavigableString) or child.name == 'div':
+        if isinstance(child, NavigableString) or child.name == 'div':
             continue
         else: break
 
@@ -161,7 +198,7 @@ def extract_introduction(article_url):
 
     return intro
 
-def format_introduction(tag_list):
+def format_introduction(tag_list) -> List[str]:
     intro = []
     for tag in tag_list:
         if isinstance(tag, bs4.element.NavigableString):
@@ -173,22 +210,116 @@ def format_introduction(tag_list):
 
     return intro
 
-def is_premium(card):
-    card_text = card.find("p", {"class": "card-text"})
-
-    if card_text is None:
-        raise MissingCardText()
-
-    result = card_text.find("a", {"href": "/account/join/"})
-    # Note: this assumes /account/join/ will always be the first anchor
-    # within the card-text paragraph
-
-    if result is None:
-        return False   # Did not find hyperlink to /account/join/
+def found_new_tutorials(original: dict, to_append: dict) -> bool:
+    """Check if all keys of `to_append` are in `original`. If not, update original."""
+    difference = to_append.keys() - original.keys() # Set difference
+    if difference != set():
+        original.update(to_append)
+        return True
     else:
-        return True    # Found hyperlink to /account/join/
+        return False
 
-def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premium=False):
+def get_metadata_element(soup, url) -> Tag:
+    """Find, validate, and return the metadata element within soup.
+
+    This function expects to find a particular <span> element from within
+    the given `soup`. We refer to this span element as "the metadata element"
+    because it contains the article's metadata (author, date, tags).
+    """
+    article = soup.find('div', 'article')
+    if not article:
+        raise MissingArticle(f"{url!r}")
+
+    # The first instance of <span class="text-muted"> is the desired element
+    metadata = article.find('span', 'text-muted')
+    if not metadata:
+        raise MissingMetadata(f"{url!r}")
+
+    # Ensure we've found the desired element by examining its first child
+    first_child = next(metadata.children)
+    if not first_child == 'by ':
+        msg = (f"first_child={first_child!r} at {url!r}")
+        raise UnexpectedFirstChild(msg)
+    return metadata
+
+
+# Processing
+Title, URL = NewType('Title', str), NewType('URL', str)
+TutorialDict = Dict[Title, URL]
+def extract_tutorials(soup, root_url="") -> Tuple[TutorialDict, TutorialDict]:
+    premium_tutorials = {}
+    non_premium_tutorials = {}
+
+    cards = get_cards(soup)
+
+    for card in cards:
+        title, url = extract_card_info(card)
+        if is_premium(card):
+            premium_tutorials[title] = root_url + url
+        else:
+            non_premium_tutorials[title] = root_url + url
+
+    return premium_tutorials, non_premium_tutorials
+
+Author = namedtuple('Author', 'name link')
+Date = datetime
+Tag = namedtuple('Tag', 'name link')
+Comments = namedtuple('Comments', 'count link')
+Link = namedtuple('Link', 'id url')
+
+MetadataTuple = Tuple[
+    Optional[Author],
+    Optional[Date],
+    Optional[List[Tag]],
+    Optional[Comments]
+]
+
+# The following counter generates unique IDs for links. It is used by
+# the `extract_metadata` and `write_to_markdown` functions.
+#
+#     ```markdown
+#     Link to [Google][0], [Facebook][1], and [GitHub][2]
+#
+#     [0]: https://google.com
+#     [1]: https://facebook.com
+#     [2]: https://github.com
+#     ```
+link_counter = itertools.count(start=1)
+
+def extract_metadata(soup, url) -> MetadataTuple:
+    metadata = get_metadata_element(soup, url)
+
+    # Author
+    author = (metadata.find('a', {'href': '#author'}) or
+              metadata.find('a', {'class': 'text-muted', 'href': '/'}))
+    if author:
+        name = author.text.strip()
+        link = Link(id=next(link_counter),
+                    url=(url + author.attrs['href']))
+        author = Author(name, link)
+
+    # Date
+    above_date = metadata.find('span', 'fa-clock-o')
+    date = above_date.nextSibling if above_date else None
+    if date:
+        date = date.strip()
+        date = datetime.strptime(date, '%b %d, %Y')
+
+    # Tags
+    tags = metadata.findAll('a', 'badge badge-light text-muted')
+    if tags:
+        tags = [Tag(tag.text.strip(),
+                    Link(id=next(link_counter),
+                         url=(ROOT_URL + tag.attrs['href'])))
+                for tag in tags]
+
+    # Comments
+    # TODO: try loading the page with phantomJS to load comment count
+    comments = None
+
+    return author, date, tags, comments
+
+def write_to_markdown(url_dict, filename, title, is_premium) -> None:
     subdirectory = 'generated_markdown'
     if not os.path.exists(subdirectory):
         os.mkdir(subdirectory)
@@ -219,21 +350,7 @@ def write_to_markdown(url_dict, filename="file.md", title="# Title\n", is_premiu
 
         file.writelines(lines)
 
-def fetch_tutorial_topics():
-    print("Fetching list of available tutorial topics...")
-    response = get_response(ROOT_URL)
-    soup = get_soup(response)
-    topics_div = soup.find("div", {"class": "sidebar-module sidebar-module-inset border"})
-    topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
-
-    topics = {
-        anchor.text: ROOT_URL + anchor.attrs['href'] 
-        for anchor in topic_anchors
-    }
-
-    return topics
-
-def scrape_tutorial_topics(topic_list='all'):
+def scrape_tutorial_topics(topic_list='all') -> None:
     available_topics = fetch_tutorial_topics()
 
     if topic_list == 'all':
@@ -251,7 +368,7 @@ def scrape_tutorial_topics(topic_list='all'):
         non_premium = {}
 
         # Iterate through all available pages until we cannot find new tutorials
-        for i in count(start = 1):
+        for i in itertools.count(start=1):
             link = available_topics[topic] + f"page/{i}/"
             try:
                 response = get_response(link)
@@ -282,16 +399,8 @@ def scrape_tutorial_topics(topic_list='all'):
             filename=f"{topic}_non_premium_tutorials.md",
             title=f"# {topic}, non-premium tutorials from Real Python\n",
             is_premium=False)
-
-def found_new_tutorials(original: dict, to_append: dict):
-    """Check if all keys of `to_append` are in `original`. If not, update original."""
-    difference = to_append.keys() - original.keys() # Set difference
-    if difference != set():
-        original.update(to_append)
-        return True
-    else:
-        return False
     
+
 def main():
     load_cached_responses(CACHE_FILENAME)
 
@@ -301,6 +410,7 @@ def main():
     finally:
         print("Saving cached responses...")
         save_cached_responses(CACHE_FILENAME)
+
 
 if __name__ == "__main__":
     main()
