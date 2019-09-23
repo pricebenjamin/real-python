@@ -46,6 +46,8 @@ text to each of the extracted tutorials. For example,
 
 - [ ] Fetch author name, publication date, and number of comments, if available
 
+- [ ] Allow option to include Table of Contents for each article
+
 - [ ] Accept a list of topic strings as command line arguments.
 
 - [ ] Sort the tutorials by level of engagement (e.g., number of comments)
