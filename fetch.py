@@ -58,12 +58,6 @@ class MissingMetadata(MetadataError):
 class UnexpectedFirstChild(MetadataError):
     """First child of metadata tag was not NavigableString('by ')."""
 
-class CommentCountError(MetadataError):
-    pass
-
-class MissingCommentsAnchor(MetadataError):
-    pass
-
 
 # Cache
 def load_cached_responses(filename):
