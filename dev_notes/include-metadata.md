@@ -57,6 +57,12 @@ If we consider each object to be `missing := 0` or `not missing := 1`, then we c
 
 Instead of handling every possible combination, we should reduce the number of cases to those that we actually observe. We can query the cache of articles to determine the most common combinations, handle those cases, and ignore the rest.
 
+**Solved:** Indeed, there are only two combinations present within the article cache:
+1. All metadata exists (`1111`)
+2. Missing date (`1011`)
+
+If any other combination is found, log a warning and do not include a metadata string.
+
 ## Extraction details
 
 By inspecting a web page with all desired details, we find:
