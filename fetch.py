@@ -2,6 +2,7 @@ import bs4
 import itertools
 import os
 import pickle
+import re
 import requests
 import time
 
@@ -13,6 +14,7 @@ from bs4.element import Tag, NavigableString
 bs4Element = Union[Tag, NavigableString]
 
 ROOT_URL = 'https://realpython.com'
+GITHUB_URL = 'https://github.com/pricebenjamin/real-python'
 
 CACHE_FILENAME = 'cached_responses.pickle'
 CACHED_RESPONSES = {}
@@ -56,6 +58,12 @@ class MissingMetadata(MetadataError):
 class UnexpectedFirstChild(MetadataError):
     """First child of metadata tag was not NavigableString('by ')."""
 
+class CommentCountError(MetadataError):
+    pass
+
+class MissingCommentsAnchor(MetadataError):
+    pass
+
 
 # Cache
 def load_cached_responses(filename):
@@ -84,15 +92,18 @@ def save_cached_responses(filename):
         pickle.dump(CACHED_RESPONSES, f)
 
 
-# Helpers   
+# Helpers
+default_headers = requests.utils.default_headers()
+default_headers['User-Agent'] += f" ({GITHUB_URL})"
+session = requests.Session()
+
 def get_response(url):
-    global CACHED_RESPONSES
+    global CACHED_RESPONSES, session
     if url in CACHED_RESPONSES:
         print(f"Loading cached response: {url}")
         response = CACHED_RESPONSES[url]
         return response
-    with requests.Session() as session:
-        response = session.get(url)
+    response = session.get(url, headers=default_headers)
     if response.status_code == 200:
         print(f"Successful get: {url}")
         print(f"    content length: {len(response.content)}")
@@ -164,13 +175,7 @@ def is_premium(card) -> bool:
     else:
         return True    # Found hyperlink to /account/join/
 
-def extract_introduction(article_url) -> List[bs4Element]:
-    try:
-        response = get_response(article_url)
-    except GetReponseError as e:
-        raise ExtractIntroductionError() from e
-
-    soup = get_soup(response)
+def extract_introduction(soup, article_url) -> List[bs4Element]:
     article_body = soup.find('div', {'class': 'article-body'})
 
     if article_body.find('h2') == None:
@@ -242,6 +247,11 @@ def get_metadata_element(soup, url) -> Tag:
         raise UnexpectedFirstChild(msg)
     return metadata
 
+def generate_count_query_url(article_url):
+    # Real Python uses a disqus query to count comments on a given article
+    disqus_url = 'https://realpython.disqus.com/count-data.js'
+    return disqus_url + '?1=' + requests.utils.quote(article_url, safe='')
+
 
 # Processing
 Title, URL = NewType('Title', str), NewType('URL', str)
@@ -254,6 +264,8 @@ def extract_tutorials(soup, root_url="") -> Tuple[TutorialDict, TutorialDict]:
 
     for card in cards:
         title, url = extract_card_info(card)
+        if '/courses/' in url: # We're only interested in tutorials
+            continue
         if is_premium(card):
             premium_tutorials[title] = root_url + url
         else:
@@ -286,14 +298,16 @@ MetadataTuple = Tuple[
 #     ```
 link_counter = itertools.count(start=1)
 
-def extract_metadata(soup, url) -> MetadataTuple:
-    metadata = get_metadata_element(soup, url)
+def extract_metadata(soup, article_url) -> MetadataTuple:
+    metadata = get_metadata_element(soup, article_url)
 
     # Author
     author = (metadata.find('a', {'href': '#author'}) or
+              metadata.find('a', {'href': '#team'}) or
               metadata.find('a', {'class': 'text-muted', 'href': '/'}))
     if author:
         name = author.text.strip()
+        url = ROOT_URL if author.attrs['href'] == '/' else article_url
         link = Link(id=next(link_counter),
                     url=(url + author.attrs['href']))
         author = Author(name, link)
@@ -314,10 +328,35 @@ def extract_metadata(soup, url) -> MetadataTuple:
                 for tag in tags]
 
     # Comments
-    # TODO: try loading the page with phantomJS to load comment count
-    comments = None
+    comments = metadata.find('a', {'href': '#reader-comments'})
+    if comments:
+        # Real Python uses a disqus query to count the comments on a given article
+        disqus = metadata.find('span', 'disqus-comment-count')
+        query_url = generate_count_query_url(disqus.attrs['data-disqus-identifier'])
+        response = get_response(query_url)
+        count = extract_comment_count(response)
+        link = Link(id=next(link_counter),
+                    url=(article_url + comments.attrs['href']))
+        comments = Comments(count, link)
 
     return author, date, tags, comments
+
+# Compile regular expression for searching disqus count query response
+count_query_response_re = re.compile(r'"comments":(\d+)')
+
+def extract_comment_count(disqus_response) -> int:
+    match = count_query_response_re.search(disqus_response.text)
+    if match:
+        count, = match.groups()
+        count = int(count)
+    else:
+        msg = (f"Failed to parse comment count query response;\n\n"
+               f"regexp == {count_query_response_re!r}\n\n"
+               f"disqus_response.text == {disqus_response.text!r}")
+        raise CommentCountError(msg)
+    return count
+
+metadata_cases = set()
 
 def write_to_markdown(url_dict, filename, title, is_premium) -> None:
     subdirectory = 'generated_markdown'
@@ -328,12 +367,16 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
         lines = [title, '\n']
         
         for title, url in url_dict.items():
+            response = get_response(url)
+            soup = get_soup(response)
             lines.append(f"### [{title}]({url})\n")
             if not is_premium:
+                metadata_cases.add(
+                    tuple(bool(item) for item in extract_metadata(soup, url)))
                 # Write the introduction to the file
                 lines.append('\n')
                 try:
-                    intro = extract_introduction(url)
+                    intro = extract_introduction(soup, url)
                 except MissingH2:
                     lines.append('> <p>No introduction available.</p>\n')
                 except ExtractIntroductionError as e:
@@ -406,10 +449,11 @@ def main():
 
     # TODO(ben): accept command line arguments to specify topics
     try:
-        scrape_tutorial_topics()
+        scrape_tutorial_topics('all')
     finally:
         print("Saving cached responses...")
         save_cached_responses(CACHE_FILENAME)
+        session.close()
 
 
 if __name__ == "__main__":
