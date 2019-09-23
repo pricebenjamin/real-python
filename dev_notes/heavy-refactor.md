@@ -11,34 +11,26 @@ Some functions do not have obvious return type, e.g. `format_introduction`, `ext
 ## Untangle the spaghetti
 
 Currently, the call graph looks like this.
-```python
-{
-    main: [
-        load_cached_responses: [], # updates global CACHED_RESPONSES dict
-        scrape_tutorial_topics: [
-            fetch_tutorial_topics: [
-                get_response, # updates CACHED_RESPONSES
-                get_soup,
-            ],
-            get_response,
-            get_soup,
-            extract_tutorials: [
-                get_cards,
-                extract_card_info,
-                is_premium,
-            ],
-            found_new_tutorials, # confusingly named, probably
-            write_to_markdown: [
-                extract_introduction: [
-                    get_response,
-                    get_soup,
-                ],
-                format_introduction,
-            ]
-        ],
-        save_cached_responses: [],
-    ]
-}
+```
+main
+  ├ load_cached_responses     # updates global CACHED_RESPONSES dict
+  ├ scrape_tutorial_topics
+  │   ├ fetch_tutorial_topics
+  │   │   ├ get_response      # updates CACHED_RESPONSES
+  │   │   └ get_soup
+  │   ├ get_response
+  │   ├ get_soup
+  │   ├ extract_tutorials
+  │   │   ├ get_cards
+  │   │   ├ extract_card_info
+  │   │   └ is_premium
+  │   ├ found_new_tutorials   # confusingly named, probably
+  │   └ write_to_markdown
+  │       ├ extract_introduction
+  │       │   ├ get_response
+  │       │   └ get_soup
+  │       └ format_introduction
+  └ save_cached_responses
 ```
 
 Honestly, the call graph could be *much* worse. However, some functions are not used outside of a particular scope. 
