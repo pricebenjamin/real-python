@@ -56,6 +56,52 @@ scrape_tutorial_topics('advanced', 'intermediate')
 ```
 This lays some ground work for later enabling command-line arguments.
 
+## Possible refactoring of `main()`:
+
+Attempt #1
+
+```python
+def main():
+    # Consider using requests-cache to handle caching
+    topics = fetch_tutorial_topics('all')
+    for topic in topics:
+        tutorials = find_tutorials_under_topic(topic) # Generator, maybe?
+        with open(markdown_file, 'w') as dest:
+            dest.write(topic.markdown_title)
+            for tutorial in tutorials:
+                dest.write(tutorial.markdown_summary)
+
+```
+
+Attempt #2
+
+```python
+from argparse import ArgumentParser
+from operator import attrgetter
+from summarizer import Summarizer
+
+parser = ArgumentParser(description)
+parser.add_argument(...)
+parser.add_argument(...)
+parser.add_argument(...)
+
+def main():
+    args = parser.parser_args()
+    summarizer = Summarizer(**args)
+
+    for topic in summarizer.topics:
+        with open(topic.markdown_destination, 'w') as dest:
+            dest.write(topic.markdown_title + '\n\n')
+            for tutorial in sorted(
+                topic.tutorials,
+                key=attrgetter('is_premium', 'date', 'comment_count')
+            ):
+                dest.write(tutorial.markdown_author_date_string + '\n\n')
+                dest.write(tutorial.markdown_summary + '\n\n')
+
+if __name__ == "__main__":
+    main()
+```
 
 ## Create cache context manager
 
