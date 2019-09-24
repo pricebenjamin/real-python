@@ -1,4 +1,5 @@
 import bs4
+import html2markdown
 import itertools
 import os
 import pickle
@@ -246,8 +247,8 @@ def generate_count_query_url(article_url):
     disqus_url = 'https://realpython.disqus.com/count-data.js'
     return disqus_url + '?1=' + requests.utils.quote(article_url, safe='')
 
-def generate_metadata_string_and_append_links(soup, article_url, links=None) -> str:
-    author, date, tags, comments = extract_metadata(soup, article_url)
+def generate_metadata_string_and_append_links(
+    author, date, tags, comments, links=None) -> str:
     if author and tags and comments:
         tag_links = ', '.join([
             f"[{tag.name}][{tag.link.id}]" for tag in tags])
@@ -300,26 +301,9 @@ Tag = namedtuple('Tag', 'name link')
 Comments = namedtuple('Comments', 'count link')
 Link = namedtuple('Link', 'id url')
 
-MetadataTuple = Tuple[
-    Optional[Author],
-    Optional[Date],
-    Optional[List[Tag]],
-    Optional[Comments]
-]
+Metadata = namedtuple('Metadata', 'author date tags comments')
 
-# The following counter generates unique IDs for links. It is used by
-# the `extract_metadata` and `write_to_markdown` functions.
-#
-#     ```markdown
-#     Link to [Google][0], [Facebook][1], and [GitHub][2]
-#
-#     [0]: https://google.com
-#     [1]: https://facebook.com
-#     [2]: https://github.com
-#     ```
-link_counter = itertools.count(start=1)
-
-def extract_metadata(soup, article_url) -> MetadataTuple:
+def extract_metadata(soup, article_url, link_counter) -> Metadata:
     metadata = get_metadata_element(soup, article_url)
 
     # Author
@@ -360,7 +344,7 @@ def extract_metadata(soup, article_url) -> MetadataTuple:
                     url=(article_url + comments.attrs['href']))
         comments = Comments(count, link)
 
-    return author, date, tags, comments
+    return Metadata(author, date, tags, comments)
 
 # Compile regular expression for searching disqus count query response
 count_query_response_re = re.compile(r'"comments":(\d+)')
@@ -382,9 +366,10 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
     if not os.path.exists(subdirectory):
         os.mkdir(subdirectory)
     path = os.path.join(subdirectory, filename)
+
     with open(path, 'w') as file:
         lines = [title, '\n']
-        
+        link_counter = itertools.count(start=1)
         for title, url in url_dict.items():
             response = get_response(url)
             soup = get_soup(response)
@@ -395,9 +380,16 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
 
             if not is_premium:
                 # Write the introduction to the file
-                metadata_string = generate_metadata_string_and_append_links(soup, url, links=article_links)
+                metadata = extract_metadata(soup, url, link_counter)
+                metadata_string = generate_metadata_string_and_append_links(
+                                      author=metadata.author, 
+                                      date=metadata.date,
+                                      tags=metadata.tags,
+                                      comments=metadata.comments,
+                                      links=article_links)
                 if metadata_string:
                     lines.append(metadata_string + '\n\n')
+
                 try:
                     intro = extract_introduction(soup, url)
                 except MissingH2:
@@ -409,14 +401,14 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
                     print(f"    error: {e}")
                     continue
                 else:
-                    for line in format_introduction(intro):
-                        lines.append('> ' + line + '\n')
-                    lines.append('\n')
+                    for tag in intro:
+                        md = html2markdown.convert(tag.decode()) + '\n\n'
+                        lines.append(md)
                 finally:
                     article_links.sort(key=lambda link: link.id)
                     for link in article_links:
                         lines.append(f"[{link.id}]: {link.url}\n")
-                    lines.append('\n')
+                    lines.append('\n\n')
 
         file.writelines(lines)
 
