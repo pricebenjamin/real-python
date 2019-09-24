@@ -12,6 +12,9 @@ Some functions do not have obvious return type, e.g. `format_introduction`, `ext
 
 Currently, the call graph looks like this.
 ```
+CACHED_RESPONSES = {}
+session = requests.Session()
+
 main
   ├ load_cached_responses     # updates global CACHED_RESPONSES dict
   ├ scrape_tutorial_topics
@@ -26,11 +29,17 @@ main
   │   │   └ is_premium
   │   ├ found_new_tutorials   # confusingly named, probably
   │   └ write_to_markdown
-  │       ├ extract_introduction
+  │       ├ get_response
+  │       ├ get_soup
+  │       ├ extract_metadata
+  │       │   ├ get_metadata_element
+  │       │   ├ generate_count_query_url
   │       │   ├ get_response
-  │       │   └ get_soup
-  │       └ format_introduction
-  └ save_cached_responses
+  │       │   └ extract_comment_count
+  │       ├ generate_metadata_string_and_append_links
+  │       └ extract_introduction
+  ├ save_cached_responses
+  └ session.close()
 ```
 
 Honestly, the call graph could be *much* worse. However, some functions are not used outside of a particular scope.
