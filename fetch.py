@@ -437,7 +437,7 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
                 try:
                     intro = extract_introduction(soup, url)
                 except MissingH2:
-                    lines.append("> <p>No introduction available.</p>\n\n")
+                    lines.append("> No introduction available.\n\n")
                 except ExtractIntroductionError as e:
                     print("Unable to extract introduction for")
                     print(f"    title: {title}")
