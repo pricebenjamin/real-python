@@ -420,13 +420,16 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
 
         file.writelines(lines)
 
-def scrape_tutorial_topics(topic_list='all') -> None:
+def scrape_tutorial_topics(*topics):
+    if not topics:
+        raise ValueError(f"at least one topic must be specified")
+
     available_topics = fetch_tutorial_topics()
 
-    if topic_list == 'all':
-        topic_list = available_topics.keys()
+    if 'all' in topics:
+        topics = available_topics.keys()
     
-    for topic in topic_list:
+    for topic in topics:
         if topic not in available_topics:
             msg = (f"'{topic}' is not in the list of available topics\n\n"
                    f"Available topics include {set(available_topics.keys())!r}")
