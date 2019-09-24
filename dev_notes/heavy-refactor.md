@@ -33,7 +33,7 @@ main
   └ save_cached_responses
 ```
 
-Honestly, the call graph could be *much* worse. However, some functions are not used outside of a particular scope. 
+Honestly, the call graph could be *much* worse. However, some functions are not used outside of a particular scope.
 
 Example 1: `get_cards` and `extract_card_info` are only ever called from within `extract_tutorials`. Perhaps these two functions should be *methods* of some callable `TutorialExtractor` class.
 
@@ -41,7 +41,7 @@ Example 2: `extract_introduction` and `format_introduction` are only ever called
 
 Encapsulating these functions will help clean up the top-level of the script when folded.
 
-However, `scrape_tutorial_topics` has the opposite problem. It does not provide *meaningful* encapsulation. In fact it gets in the way; in order to understand what `main` *does*, you must follow the call. ~I believe I did this because the code within `scrape_tutorial_topics` was ugly. However, instead of making it better, I hid it away...*tsk tsk*~ Actually, the main motivation for moving this logic into a separate function was to enable fetching of a particular topic list, e.g. 
+However, `scrape_tutorial_topics` has the opposite problem. It does not provide *meaningful* encapsulation. In fact it gets in the way; in order to understand what `main` *does*, you must follow the call. ~I believe I did this because the code within `scrape_tutorial_topics` was ugly. However, instead of making it better, I hid it away...*tsk tsk*~ Actually, the main motivation for moving this logic into a separate function was to enable fetching of a particular topic list, e.g.
 ```python
 scrape_tutorial_topics('advanced', 'intermediate')
 ```
@@ -96,7 +96,7 @@ class Scraper:
         if url in self.cache:
             return self.cache[url]
         response = self.sess.get(url)
-        
+
         # Check that response is good or raise error
         ...
 
