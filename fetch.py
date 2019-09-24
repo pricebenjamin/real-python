@@ -286,11 +286,13 @@ def extract_tutorials(soup, root_url="") -> Tuple[TutorialDict, TutorialDict]:
 
     for card in cards:
         title, url = extract_card_info(card)
-        if '/courses/' in url: # We're only interested in tutorials
-            continue
         if is_premium(card):
             premium_tutorials[title] = root_url + url
         else:
+            if '/courses/' in url:
+                # TODO: Fix this edge case by creating a separate metadata
+                # extractor for "courses".
+                continue
             non_premium_tutorials[title] = root_url + url
 
     return premium_tutorials, non_premium_tutorials
@@ -374,11 +376,12 @@ def write_to_markdown(url_dict, filename, title, is_premium) -> None:
             response = get_response(url)
             soup = get_soup(response)
 
-            article_links = []
-            article_links.append(Link(id=next(link_counter), url=url))
-            lines.append(f"## [{title}][{article_links[0].id}]\n")
-
-            if not is_premium:
+            if is_premium:
+                lines.append(f"## [{title}]({url})\n\n")
+            else:
+                article_links = []
+                article_links.append(Link(id=next(link_counter), url=url))
+                lines.append(f"## [{title}][{article_links[0].id}]\n")
                 # Write the introduction to the file
                 metadata = extract_metadata(soup, url, link_counter)
                 metadata_string = generate_metadata_string_and_append_links(
