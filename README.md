@@ -53,7 +53,7 @@ text to each of the extracted tutorials. For example,
 
 - [ ] Sort the tutorials by level of engagement (e.g., number of comments)
 
-- [ ] Implement output formats other than markdown 
+- [ ] Implement output formats other than markdown
 
 [rp]: https://realpython.com
 [topics]: https://realpython.com/tutorials/all/
