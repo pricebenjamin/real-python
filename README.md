@@ -44,7 +44,9 @@ text to each of the extracted tutorials. For example,
 
 - [X] Add support for fetching a particular topic.
 
-- [ ] Fetch author name, publication date, and number of comments, if available
+- [X] Fetch author name, publication date, and number of comments, if available
+
+- [X] Make the raw markdown more readable by using reference links
 
 - [ ] Allow option to include Table of Contents for each article
 
