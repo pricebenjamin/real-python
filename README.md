@@ -13,8 +13,7 @@ Wouldn't it be nice if I could just skim over the introductions?
 
 ## Fetch introductions for all [Real Python][rp] articles
 
-This script depends on `requests`, `beautifulsoup4`, and `html5lib`, all of
-which can be installed via `pip`.
+This script depends on `requests`, `beautifulsoup4`, `html5lib`, and `html2markdown`, all of which can be installed via `pip`.
 
 If you would like use this script, then clone the repo and run the following:
 
@@ -44,7 +43,9 @@ text to each of the extracted tutorials. For example,
 
 - [X] Add support for fetching a particular topic.
 
-- [ ] Fetch author name, publication date, and number of comments, if available
+- [X] Fetch author name, publication date, and number of comments, if available
+
+- [X] Make the raw markdown more readable by using reference links
 
 - [ ] Allow option to include Table of Contents for each article
 

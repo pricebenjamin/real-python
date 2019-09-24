@@ -11,6 +11,7 @@ bowler = "*"
 requests = "*"
 beautifulsoup4 = "*"
 html5lib = "*"
+html2markdown = "*"
 
 [requires]
 python_version = "3.7"
