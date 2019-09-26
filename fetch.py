@@ -160,7 +160,9 @@ def fetch_tutorial_topics():
     )
     topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
 
-    topics = {anchor.text: ROOT_URL + anchor.attrs["href"] for anchor in topic_anchors}
+    topics = {
+        anchor.text.strip(): ROOT_URL + anchor.attrs["href"] for anchor in topic_anchors
+    }
 
     return topics
 
