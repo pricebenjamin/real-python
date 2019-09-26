@@ -296,7 +296,7 @@ def generate_metadata_string_and_append_links(
             + f"({comment_link})"
         )
 
-        if links:
+        if links is not None:
             links.append(author.link)
             links.extend([tag.link for tag in tags])
             links.append(comments.link)
