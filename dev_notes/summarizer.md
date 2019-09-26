@@ -35,13 +35,15 @@ def main():
                 key=attrgetter('date', 'comment_count'),
                 reverse=True
             ):
+                dest.write(tutorial.markdown_title + '\n\n')
+
                 # metadata string includes author, date, tags, and comment count
                 dest.write(tutorial.markdown_metadata_string + '\n\n')
-
                 dest.write(tutorial.markdown_introduction + '\n\n')
 
                 # write table of contents, if available
                 dest.write(tutorial.toc + '\n\n') if tutorial.has_toc
+                dest.write(tutorial.markdown_references + '\n\n')
 
 if __name__ == "__main__":
     main()
