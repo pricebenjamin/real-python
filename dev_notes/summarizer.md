@@ -18,9 +18,9 @@ def main():
 
     for topic in summarizer.topics:
         # Create a filename using the topic string
-        with open(f"{topic}_tutorials.md", 'w') as dest:
+        with open(f"{topic.name}_tutorials.md", 'w') as dest:
 
-            markdown_title = f"# {topic.capitalize()} tutorials from Real Python"
+            markdown_title = f"# {topic.name.capitalize()} tutorials from Real Python"
             dest.write(markdown_title + '\n\n')
 
             # Remove tutorials that are missing dates / comment counts
