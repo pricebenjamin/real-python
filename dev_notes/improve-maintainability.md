@@ -2,12 +2,62 @@
 
 I'm not an expert on how to write maintainable code, but you tend to get better at things by practicing. I'll try to include citations to books or articles that talk about maintainability and best practices.
 
+
 ## Move core logic behind a semi-stable interface
 
 Currently, all functions are exposed to the end user. However, to improve
 the organization of the existing code, many of these functions will be removed,
 and their functionality will be absorbed into other functions. To adopt these
 changes while maintaining usability, an interface should be installed.
+
+
+## Possible interfaces:
+
+### Procedural
+
+```python
+def main():
+    # Consider using requests-cache to handle caching
+    topics = fetch_tutorial_topics('all')
+    for topic in topics:
+        tutorials = find_tutorials_under_topic(topic) # Generator, maybe?
+        with open(markdown_file, 'w') as dest:
+            dest.write(topic.markdown_title)
+            for tutorial in tutorials:
+                dest.write(tutorial.markdown_summary)
+
+```
+
+### Object-oriented
+
+```python
+from argparse import ArgumentParser
+from operator import attrgetter
+from summarizer import Summarizer
+
+parser = ArgumentParser(description)
+parser.add_argument(...)
+parser.add_argument(...)
+parser.add_argument(...)
+
+def main():
+    args = parser.parser_args()
+    summarizer = Summarizer(**args)
+
+    for topic in summarizer.topics:
+        with open(topic.markdown_destination, 'w') as dest:
+            dest.write(topic.markdown_title + '\n\n')
+            for tutorial in sorted(
+                topic.tutorials,
+                key=attrgetter('is_premium', 'date', 'comment_count')
+            ):
+                dest.write(tutorial.markdown_author_date_string + '\n\n')
+                dest.write(tutorial.markdown_summary + '\n\n')
+
+if __name__ == "__main__":
+    main()
+```
+
 
 ## Add type hints
 
@@ -62,52 +112,6 @@ scrape_tutorial_topics('advanced', 'intermediate')
 ```
 This lays some ground work for later enabling command-line arguments.
 
-## Possible interfaces:
-
-### Procedural
-
-```python
-def main():
-    # Consider using requests-cache to handle caching
-    topics = fetch_tutorial_topics('all')
-    for topic in topics:
-        tutorials = find_tutorials_under_topic(topic) # Generator, maybe?
-        with open(markdown_file, 'w') as dest:
-            dest.write(topic.markdown_title)
-            for tutorial in tutorials:
-                dest.write(tutorial.markdown_summary)
-
-```
-
-### Object-oriented
-
-```python
-from argparse import ArgumentParser
-from operator import attrgetter
-from summarizer import Summarizer
-
-parser = ArgumentParser(description)
-parser.add_argument(...)
-parser.add_argument(...)
-parser.add_argument(...)
-
-def main():
-    args = parser.parser_args()
-    summarizer = Summarizer(**args)
-
-    for topic in summarizer.topics:
-        with open(topic.markdown_destination, 'w') as dest:
-            dest.write(topic.markdown_title + '\n\n')
-            for tutorial in sorted(
-                topic.tutorials,
-                key=attrgetter('is_premium', 'date', 'comment_count')
-            ):
-                dest.write(tutorial.markdown_author_date_string + '\n\n')
-                dest.write(tutorial.markdown_summary + '\n\n')
-
-if __name__ == "__main__":
-    main()
-```
 
 ## Create cache context manager?
 
