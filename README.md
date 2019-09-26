@@ -1,3 +1,7 @@
+<p align="right">
+<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+</p>
+
 # I'm sick of skimming over titles
 
 [Real Python][rp] has some excellent articles about the Python language and
