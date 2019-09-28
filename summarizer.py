@@ -98,9 +98,7 @@ class Summarizer:
         if cls.available_topics is None:
             with requests.Session() as sess:
                 response = sess.get(cls.BASE_URL)
-                assert (
-                    response.status_code == 200
-                )  # TODO: Re-implement get_response as static/class method?
+                assert response.status_code == 200
             soup = utils.get_soup(response)
 
             topics_div = soup.find("div", "sidebar-module sidebar-module-inset border")
