@@ -8,7 +8,7 @@
 ## [Your Guide to the CPython Source Code](https://realpython.com/cpython-source-code-guide/)
 by [Anthony Shaw][1] on Aug 21, 2019 with tags: [advanced][2], [python][3] ([9 comments][4])
 
-Are there certain parts of Python that just seem magic? Like how are dictionaries so much faster than looping over a list to find an item. How does a generator remember the state of the variables each time it yields a value and why do you never have to allocate memory like other languages? It turns out, CPython, the most popular Python runtime is written in human-readable C and Python code. This tutorial will walk you through the CPython source code. 
+Are there certain parts of Python that just seem magic? Like how are dictionaries so much faster than looping over a list to find an item. How does a generator remember the state of the variables each time it yields a value and why do you never have to allocate memory like other languages? It turns out, CPython, the most popular Python runtime is written in human-readable C and Python code. This tutorial will walk you through the CPython source code.
 
 You’ll cover all the concepts behind the internals of CPython, how they work and visual explanations as you go.
 
@@ -20,7 +20,7 @@ __You’ll learn how to:__
 *   Run the test suite
 *   Modify or upgrade components of the CPython library to contribute them to future versions
 
-Yes, this is a very long article. If you just made yourself a fresh cup of tea, coffee or your favorite beverage, it’s going to be cold by the end of Part 1. 
+Yes, this is a very long article. If you just made yourself a fresh cup of tea, coffee or your favorite beverage, it’s going to be cold by the end of Part 1.
 
 This tutorial is split into five parts. Take your time for each part and make sure you try out the demos and the interactive components. You can feel a sense of achievement that you grasp the core concepts of Python that can make you a better Python programmer.
 
@@ -77,9 +77,9 @@ The following is a list of the first few children of `<div class="col-md-11 col-
 <h1>PyGame: A Primer on Game Programming in Python</h1>
 <p>
     <span class="text-muted">
-        by 
+        by
         <a class="text-muted" href="#author">Jon Fincher</a>
-        <span class="ml-2 fa fa-clock-o"></span> 
+        <span class="ml-2 fa fa-clock-o"></span>
         Sep 16, 2019
         <span class="ml-2 mr-1 fa fa-comments"></span>
         <a class="text-muted" href="#reader-comments">
@@ -113,7 +113,7 @@ A: This appears to be the case. (Checked all cached articles.)
 ```html
 <p>
     <span class="text-muted">
-        by 
+        by
         <a class="text-muted" href="/">Real Python</a>
         <span class="ml-2 mr-1 fa fa-comments"></span>
         <a class="text-muted" href="#reader-comments">

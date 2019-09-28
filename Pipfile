@@ -4,12 +4,17 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+pytest = "*"
+bowler = "*"
+black = "*"
+pre-commit = "*"
 
 [packages]
 requests = "*"
 beautifulsoup4 = "*"
 html5lib = "*"
 html2markdown = "*"
+requests-cache = "*"
 
 [requires]
 python_version = "3.7"
