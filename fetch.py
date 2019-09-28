@@ -5,10 +5,13 @@ import os
 import pickle
 import re
 import requests
+import requests_cache
+
 import time
 
 from datetime import datetime
 from collections import namedtuple
+from urllib.parse import urljoin
 
 from typing import List, Union, Tuple, Dict, Optional, NewType
 from bs4.element import Tag, NavigableString
@@ -18,8 +21,7 @@ bs4Element = Union[Tag, NavigableString]
 ROOT_URL = "https://realpython.com"
 GITHUB_URL = "https://github.com/pricebenjamin/real-python"
 
-CACHE_FILENAME = "cached_responses.pickle"
-CACHED_RESPONSES = {}
+REQUESTS_CACHE_FILENAME = "requests_cache"
 
 
 class Error(Exception):
@@ -74,69 +76,6 @@ class UnexpectedFirstChild(MetadataError):
     """First child of metadata tag was not NavigableString('by ')."""
 
 
-# Cache
-def load_cached_responses(filename):
-    """Populate CACHED_RESPONSES by reading from a file.
-
-    Args:
-        filename (str): name of the file to unpic
-
-    Returns:
-        None
-
-    Modifies:
-        CACHED_RESPONSES (dict[url, requests.response])"""
-    global CACHED_RESPONSES
-    try:
-        with open(filename, "rb") as f:
-            prev_cache = pickle.load(f)
-    except IOError as e:
-        print(f"Cache not loaded. ({e})")
-    else:
-        CACHED_RESPONSES.update(prev_cache)
-
-
-def save_cached_responses(filename):
-    global CACHED_RESPONSES
-    with open(filename, "wb") as f:
-        pickle.dump(CACHED_RESPONSES, f)
-
-
-# Helpers
-default_headers = requests.utils.default_headers()
-default_headers["User-Agent"] += f" ({GITHUB_URL})"
-session = requests.Session()
-
-
-def get_response(url):
-    global CACHED_RESPONSES, session
-    if url in CACHED_RESPONSES:
-        print(f"Loading cached response: {url}")
-        response = CACHED_RESPONSES[url]
-        return response
-    response = session.get(url, headers=default_headers)
-    if response.status_code == 200:
-        print(f"Successful get: {url}")
-        print(f"    content length: {len(response.content)}")
-        CACHED_RESPONSES[url] = response
-        print(f"    cached: True")
-        return response
-    elif response.status_code == 429:
-        print("Received status code 429: Too many requests.")
-        retry_after = response.headers.get("Retry-After", "")
-        try:
-            count = int(retry_after)
-        except ValueError:
-            count = 10
-        sleep_for(count)  # TODO: implement more robust rate-limiting
-        return get_response(url)
-    else:
-        print("Error: unsuccessful get")
-        print(f"    url: {url}")
-        print(f"    status: {response.status_code}")
-        raise UnsuccessfulGet(url)
-
-
 def get_soup(response):
     return bs4.BeautifulSoup(response.content, "html5lib")
 
@@ -151,77 +90,33 @@ def sleep_for(count):
     print()
 
 
-def fetch_tutorial_topics():
-    print("Fetching list of available tutorial topics...")
-    response = get_response(ROOT_URL)
-    soup = get_soup(response)
-    topics_div = soup.find(
-        "div", {"class": "sidebar-module sidebar-module-inset border"}
-    )
-    topic_anchors = topics_div.findAll("a", {"class": "badge badge-light text-muted"})
-
-    topics = {
-        anchor.text.strip(): ROOT_URL + anchor.attrs["href"] for anchor in topic_anchors
-    }
-
-    return topics
+date_re = re.compile(r"([A-Za-z]{3} \d+, \d{4})")
 
 
 def get_cards(soup) -> List[Tag]:
     return soup.findAll("div", {"class": "card border-0"})
 
 
-def extract_card_info(card) -> Tuple[str, str]:
+def extract_card_info(card):
     body = card.find("div", {"class": "card-body"})
     title = body.find("h2").text
     url = body.find("a").attrs["href"]
-    return title, url
 
+    title = card.find("h2", "card-title")
+    assert title
+    title_str = title.text.strip()
 
-def is_premium(card) -> bool:
-    card_text = card.find("p", {"class": "card-text"})
+    url = title.parent.attrs["href"]
 
-    if card_text is None:
-        raise MissingCardText()
+    is_premium = bool(card.find("a", {"href": "/account/join/"}))
 
-    result = card_text.find("a", {"href": "/account/join/"})
-    # Note: this assumes /account/join/ will always be the first anchor
-    # within the card-text paragraph
+    match = date_re.search(card.text)
+    date = datetime.strptime(match.group(0), "%b %d, %Y") if match else None
 
-    if result is None:
-        return False  # Did not find hyperlink to /account/join/
-    else:
-        return True  # Found hyperlink to /account/join/
+    tags = card.find_all("a", "badge badge-light text-muted")
+    tags = tags if tags else None  # return None instead of empty list
 
-
-def extract_introduction(soup, article_url) -> List[bs4Element]:
-    article_body = soup.find("div", {"class": "article-body"})
-
-    if article_body.find("h2") == None:
-        raise MissingH2()
-
-    # Introductory text is nested between divs at the beginning of the body.
-    # As such, we begin by skipping over blank lines and divs:
-    children = article_body.children
-    while True:
-        child = next(children)
-        if isinstance(child, NavigableString) or child.name == "div":
-            continue
-        else:
-            break
-
-    # Store all remaining non-div elements until we hit the next div
-    intro = [child]
-    while True:
-        child = next(children)
-        if child == "\n":
-            continue
-        elif child.name == "div" or child.name == "h2":
-            break
-        else:
-            intro.append(child)
-
-    return intro
+    return title_str, url, is_premium, date, tags
 
 
 def format_introduction(tag_list) -> List[str]:
@@ -330,62 +225,6 @@ def extract_tutorials(soup, root_url="") -> Tuple[TutorialDict, TutorialDict]:
     return premium_tutorials, non_premium_tutorials
 
 
-Author = namedtuple("Author", "name link")
-Date = datetime
-Tag = namedtuple("Tag", "name link")
-Comments = namedtuple("Comments", "count link")
-Link = namedtuple("Link", "id url")
-
-Metadata = namedtuple("Metadata", "author date tags comments")
-
-
-def extract_metadata(soup, article_url, link_counter) -> Metadata:
-    metadata = get_metadata_element(soup, article_url)
-
-    # Author
-    author = (
-        metadata.find("a", {"href": "#author"})
-        or metadata.find("a", {"href": "#team"})
-        or metadata.find("a", {"class": "text-muted", "href": "/"})
-    )
-    if author:
-        name = author.text.strip()
-        url = ROOT_URL if author.attrs["href"] == "/" else article_url
-        link = Link(id=next(link_counter), url=(url + author.attrs["href"]))
-        author = Author(name, link)
-
-    # Date
-    above_date = metadata.find("span", "fa-clock-o")
-    date = above_date.nextSibling if above_date else None
-    if date:
-        date = date.strip()
-        date = datetime.strptime(date, "%b %d, %Y")
-
-    # Tags
-    tags = metadata.findAll("a", "badge badge-light text-muted")
-    if tags:
-        tags = [
-            Tag(
-                tag.text.strip(),
-                Link(id=next(link_counter), url=(ROOT_URL + tag.attrs["href"])),
-            )
-            for tag in tags
-        ]
-
-    # Comments
-    comments = metadata.find("a", {"href": "#reader-comments"})
-    if comments:
-        # Real Python uses a disqus query to count the comments on a given article
-        disqus = metadata.find("span", "disqus-comment-count")
-        query_url = generate_count_query_url(disqus.attrs["data-disqus-identifier"])
-        response = get_response(query_url)
-        count = extract_comment_count(response)
-        link = Link(id=next(link_counter), url=(article_url + comments.attrs["href"]))
-        comments = Comments(count, link)
-
-    return Metadata(author, date, tags, comments)
-
-
 # Compile regular expression for searching disqus count query response
 count_query_response_re = re.compile(r'"comments":(\d+)')
 
@@ -403,131 +242,3 @@ def extract_comment_count(disqus_response) -> int:
         )
         raise CommentCountError(msg)
     return count
-
-
-def write_to_markdown(url_dict, filename, title, is_premium) -> None:
-    subdirectory = "generated_markdown"
-    if not os.path.exists(subdirectory):
-        os.mkdir(subdirectory)
-    path = os.path.join(subdirectory, filename)
-
-    with open(path, "w") as file:
-        lines = [title, "\n"]
-        link_counter = itertools.count(start=1)
-        for title, url in url_dict.items():
-            response = get_response(url)
-            soup = get_soup(response)
-
-            if is_premium:
-                lines.append(f"## [{title}]({url})\n\n")
-            else:
-                article_links = []
-                article_links.append(Link(id=next(link_counter), url=url))
-                lines.append(f"## [{title}][{article_links[0].id}]\n")
-                # Write the introduction to the file
-                metadata = extract_metadata(soup, url, link_counter)
-                metadata_string = generate_metadata_string_and_append_links(
-                    author=metadata.author,
-                    date=metadata.date,
-                    tags=metadata.tags,
-                    comments=metadata.comments,
-                    links=article_links,
-                )
-                if metadata_string:
-                    lines.append(metadata_string + "\n\n")
-
-                try:
-                    intro = extract_introduction(soup, url)
-                except MissingH2:
-                    lines.append("> No introduction available.\n\n")
-                except ExtractIntroductionError as e:
-                    print("Unable to extract introduction for")
-                    print(f"    title: {title}")
-                    print(f"    url: {url}")
-                    print(f"    error: {e}")
-                    continue
-                else:
-                    for tag in intro:
-                        md = html2markdown.convert(tag.decode()) + "\n\n"
-                        lines.append(md)
-                finally:
-                    article_links.sort(key=lambda link: link.id)
-                    for link in article_links:
-                        lines.append(f"[{link.id}]: {link.url}\n")
-                    lines.append("\n\n")
-
-        file.writelines(lines)
-
-
-def scrape_tutorial_topics(*topics):
-    if not topics:
-        raise ValueError(f"at least one topic must be specified")
-
-    available_topics = fetch_tutorial_topics()
-
-    if "all" in topics:
-        topics = available_topics.keys()
-
-    for topic in topics:
-        if topic not in available_topics:
-            msg = (
-                f"'{topic}' is not in the list of available topics\n\n"
-                f"Available topics include {set(available_topics.keys())!r}"
-            )
-            raise TopicNotFound(msg)
-
-        print(f"Crawling `{topic}` tutorial pages...")
-
-        premium = {}
-        non_premium = {}
-
-        # Iterate through all available pages until we cannot find new tutorials
-        for i in itertools.count(start=1):
-            link = available_topics[topic] + f"page/{i}/"
-            try:
-                response = get_response(link)
-            except UnsuccessfulGet:
-                break
-
-            soup = get_soup(response)
-            p, np = extract_tutorials(soup, root_url=ROOT_URL)
-
-            if found_new_tutorials(premium, p) or found_new_tutorials(non_premium, np):
-                print(f"    # Premium tutorials:     {len(premium):3d}")
-                print(f"    # Non-Premium tutorials: {len(non_premium):3d}")
-                continue
-            else:
-                print("    No new tutorials found.")
-                break
-
-        print(f"Saving `{topic}` URLs into markdown...")
-
-        write_to_markdown(
-            premium,
-            filename=f"{topic}_premium_tutorials.md",
-            title=f"# {topic}, premium tutorials from Real Python\n",
-            is_premium=True,
-        )
-
-        write_to_markdown(
-            non_premium,
-            filename=f"{topic}_non_premium_tutorials.md",
-            title=f"# {topic}, non-premium tutorials from Real Python\n",
-            is_premium=False,
-        )
-
-
-def main():
-    load_cached_responses(CACHE_FILENAME)
-
-    # TODO(ben): accept command line arguments to specify topics
-    try:
-        scrape_tutorial_topics("all")
-    finally:
-        print("Saving cached responses...")
-        save_cached_responses(CACHE_FILENAME)
-        session.close()
-
-
-if __name__ == "__main__":
-    main()
