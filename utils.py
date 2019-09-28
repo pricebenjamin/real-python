@@ -3,9 +3,9 @@ import re
 import requests
 import time
 
-from bs4.element import Tag
+from collections import namedtuple
 from datetime import datetime
-from typing import List
+from typing import List, Generator
 
 # Local imports
 from exceptions import CommentCountError
@@ -25,33 +25,36 @@ def sleep_for(count):
     print()
 
 
+Card = namedtuple("Card", "title url is_premium date topic_tags")
+
+
+def get_cards(soup: bs4.BeautifulSoup) -> Generator[Card, None, None]:
+    tags = soup.find_all("div", "card border-0")
+    for tag in tags:
+        yield build_card_from_tag(tag)
+
+
 date_re = re.compile(r"([A-Za-z]{3} \d+, \d{4})")
 
 
-def get_cards(soup) -> List[Tag]:
-    return soup.findAll("div", {"class": "card border-0"})
-
-
-def extract_card_info(card):
-    body = card.find("div", {"class": "card-body"})
-    title = body.find("h2").text
-    url = body.find("a").attrs["href"]
-
-    title = card.find("h2", "card-title")
+def build_card_from_tag(bs4_tag: bs4.element.Tag) -> Card:
+    title = bs4_tag.find("h2", "card-title").text.strip()
     assert title
-    title_str = title.text.strip()
 
-    url = title.parent.attrs["href"]
+    url = bs4_tag.find("a").get("href")
+    assert url
 
-    is_premium = bool(card.find("a", {"href": "/account/join/"}))
+    is_premium = bool(bs4_tag.find("a", {"href": "/account/join/"}))
 
-    match = date_re.search(card.text)
+    match = date_re.search(bs4_tag.text)
     date = datetime.strptime(match.group(0), "%b %d, %Y") if match else None
 
-    tags = card.find_all("a", "badge badge-light text-muted")
-    tags = tags if tags else None  # return None instead of empty list
+    topic_tags = bs4_tag.find_all("a", "badge badge-light text-muted")
+    topic_tags = tuple(topic_tags) if topic_tags else None
+    # Above, we convert the bs4.element.ResultSet (the return value of find_all)
+    # to a tuple in order to support hashing of the resulting Card object.
 
-    return title_str, url, is_premium, date, tags
+    return Card(title, url, is_premium, date, topic_tags)
 
 
 def generate_count_query_url(article_url):
@@ -77,3 +80,7 @@ def extract_comment_count(disqus_response) -> int:
         )
         raise CommentCountError(msg)
     return count
+
+
+def has_multiple_pages(soup) -> bool:
+    return bool(soup.find("nav", {"aria-label": "Page Navigation"}))

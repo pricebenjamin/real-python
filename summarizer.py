@@ -8,7 +8,7 @@ import requests_cache
 from bs4.element import NavigableString, Tag
 from collections import namedtuple
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from urllib.parse import urljoin
 
 # Local imports
@@ -122,27 +122,60 @@ class Topic:
         self.name: str = name
         self.url: str = url
         self.summarizer: Summarizer = summarizer
+        self._soup = None
 
     @property
     def tutorials(self):
         return self.tutorial_generator()
 
     def tutorial_generator(self):
-        response = self.summarizer.get_response(self.url)
-        soup = utils.get_soup(response)
-        cards = utils.get_cards(soup)
-
-        for card in cards:
-            title, url, premium, date, tags = utils.extract_card_info(card)
-            if not premium or self.summarizer.include_premium:
+        for card in self.cards:
+            if not card.is_premium or self.summarizer.include_premium:
                 yield Tutorial(
-                    title=title,
-                    url=urljoin(self.summarizer._BASE_URL, url),
-                    is_premium=premium,
-                    date=date,
-                    tags=tags,
+                    title=card.title,
+                    url=urljoin(self.summarizer._BASE_URL, card.url),
+                    is_premium=card.is_premium,
+                    date=card.date,
+                    tags=card.topic_tags,
                     topic=self,
                 )
+
+    @property
+    def soup(self):
+        if self._soup is None:
+            resp = self.summarizer.get_response(self.url)
+            self._soup = utils.get_soup(resp)
+        assert self._soup
+        return self._soup
+
+    @property
+    def cards(self):
+        return self.card_generator()
+
+    def card_generator(self):
+        multipaged = utils.has_multiple_pages(self.soup)
+
+        visited_cards = set()
+        pages = itertools.count(start=1) if multipaged else [1]
+
+        for page in pages:
+            if multipaged and page > 1:
+                url = urljoin(self.url, f"page/{page}/")
+                resp = self.summarizer.get_response(url)
+                soup = utils.get_soup(resp)
+                cards = utils.get_cards(soup)
+            else:
+                cards = utils.get_cards(self.soup)
+
+            available_cards = set(cards)
+            new_cards = available_cards - visited_cards
+
+            if not new_cards:
+                break
+
+            for card in new_cards:
+                visited_cards.add(card)
+                yield card
 
 
 class Tutorial:
@@ -152,7 +185,7 @@ class Tutorial:
         url: str,
         is_premium: bool,
         date: Optional[datetime],
-        tags: Optional[List[bs4.element.Tag]],
+        tags: Optional[Tuple[bs4.element.Tag]],
         topic: Topic,
     ):
         # Already known attributes

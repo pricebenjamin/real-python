@@ -33,7 +33,7 @@ python fetch.py
 
 *__Note:__* The script will take a few minutes to run and will produce lots of
 output. Once it's done, files can be found in the `generated_markdown` subdirectory.
-A large file (~27 MiB) called `requests_cache.sqlite` will also be created. This
+A large file (~31 MiB) called `requests_cache.sqlite` will also be created. This
 file stores all previously fetched articles, allowing you to resume or rerun the
 script without bombarding the Real Python website with hundreds of prior requests.
 
