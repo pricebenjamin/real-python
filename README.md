@@ -102,5 +102,5 @@ if __name__ == "__main__":
 
 [rp]: https://realpython.com
 [topics]: https://realpython.com/tutorials/all/
-[example-md]: examples/docker_non_premium_tutorials.md
+[example-md]: examples/docker%20tutorials%20and%20courses.md
 [test-script]: test_summarizer.py
