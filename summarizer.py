@@ -4,9 +4,6 @@ import itertools
 import os
 import requests
 import requests_cache
-import textwrap
-
-import fetch  # TODO: move functions out of `fetch.py` and into `utils.py`
 
 from bs4.element import NavigableString, Tag
 from collections import namedtuple
@@ -14,19 +11,9 @@ from datetime import datetime
 from typing import Optional, List
 from urllib.parse import urljoin
 
-
-class TopicsError(Exception):
-    default_message = textwrap.dedent(
-        """\n
-        Key-word argument `selected_topics` must be either
-            (1) a list of valid topic strings OR
-            (2) the string "all"
-
-        A list of valid topics can be obtained with
-
-            Summarizer.fetch_available_topics()
-        """
-    )
+# Local imports
+import utils
+from exceptions import UnsuccessfulGet, TopicsError
 
 
 Author = namedtuple("Author", "name url")
@@ -86,13 +73,13 @@ class Summarizer:
                 count = int(retry_after)
             except ValueError:
                 count = 10
-            sleep_for(count)  # TODO: implement more robust rate-limiting
+            utils.sleep_for(count)  # TODO: implement more robust rate-limiting
             return self.get_response(url)
         else:
             print("Error: unsuccessful get")
             print(f"    url: {url}")
             print(f"    status: {response.status_code}")
-            raise fetch.UnsuccessfulGet(url)
+            raise UnsuccessfulGet(url)
 
     # TODO: Write tests for class methods!
     @classmethod
@@ -114,7 +101,7 @@ class Summarizer:
                 assert (
                     response.status_code == 200
                 )  # TODO: Re-implement get_response as static/class method?
-            soup = fetch.get_soup(response)
+            soup = utils.get_soup(response)
 
             topics_div = soup.find("div", "sidebar-module sidebar-module-inset border")
             assert topics_div  # TODO: consider raising helpful exceptions
@@ -144,11 +131,11 @@ class Topic:
 
     def tutorial_generator(self):
         response = self.summarizer.get_response(self.url)
-        soup = fetch.get_soup(response)
-        cards = fetch.get_cards(soup)
+        soup = utils.get_soup(response)
+        cards = utils.get_cards(soup)
 
         for card in cards:
-            title, url, premium, date, tags = fetch.extract_card_info(card)
+            title, url, premium, date, tags = utils.extract_card_info(card)
             if not premium or self.summarizer.include_premium:
                 yield Tutorial(
                     title=title,
@@ -212,7 +199,7 @@ class Tutorial:
     def soup(self):
         if self._soup is None:
             response = self.topic.summarizer.get_response(self.url)
-            self._soup = fetch.get_soup(response)
+            self._soup = utils.get_soup(response)
         assert self._soup
         return self._soup
 
@@ -302,11 +289,11 @@ class Tutorial:
             if self._comments is None:
                 comments = self.metadata_element.find("a", {"href": "#reader-comments"})
                 disqus = self.metadata_element.find("span", "disqus-comment-count")
-                query_url = fetch.generate_count_query_url(
+                query_url = utils.generate_count_query_url(
                     disqus.attrs["data-disqus-identifier"]
                 )
                 response = self.topic.summarizer.get_response(query_url)
-                count = fetch.extract_comment_count(response)
+                count = utils.extract_comment_count(response)
                 url = urljoin(self.url, comments.attrs["href"])
                 self._comments = Comments(count, url)
             return self._comments
@@ -378,9 +365,12 @@ class Tutorial:
                 intro = [child]
                 while inside_intro:
                     child = next(ab_children)
-                    if isinstance(child, NavigableString) or child.name == "div":
+                    if child.name == "div" or (child.name == "p" and child.attrs):
+                        # Note: checking if child.attrs is empty is an attempt to catch
+                        # interview articles such as
+                        # https://realpython.com/interview-katrina-durance/
                         inside_intro = False
-                    else:
+                    elif not isinstance(child, NavigableString):
                         intro.append(child)
 
             self._markdown_introduction = "\n\n".join(

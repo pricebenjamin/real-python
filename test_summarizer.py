@@ -1,7 +1,7 @@
-import fetch
 import os
-
 from operator import attrgetter
+
+# Local imports
 from summarizer import Summarizer
 
 if __name__ == "__main__":
