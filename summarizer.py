@@ -29,10 +29,9 @@ default_headers = requests.utils.default_headers()
 
 class Summarizer:
 
-    BASE_URL = "https://realpython.com"
-    GITHUB_URL = "https://github.com/pricebenjamin/real-python"
-    available_topics = None
-    user_agent = " ".join([default_headers["User-Agent"], GITHUB_URL])
+    _BASE_URL = "https://realpython.com"
+    _GITHUB_URL = "https://github.com/pricebenjamin/real-python"
+    _available_topics = None
 
     def __init__(self, selected_topics="all", include_premium=True, output_dir=None):
         self.selected_topics = self.validate_topics(selected_topics)
@@ -45,7 +44,8 @@ class Summarizer:
         self.output_dir = output_dir
 
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": self.user_agent})
+        user_agent = " ".join([default_headers["User-Agent"], self._GITHUB_URL])
+        self.session.headers.update({"User-Agent": user_agent})
 
     @property
     def topics(self):
@@ -55,7 +55,7 @@ class Summarizer:
         for topic in self.selected_topics:
             yield Topic(
                 name=topic,
-                url=self.available_topics[topic],
+                url=self._available_topics[topic],
                 summarizer=self,  # Topics need access to Summarizer's get_response method
             )
 
@@ -85,19 +85,19 @@ class Summarizer:
     @classmethod
     def validate_topics(cls, topic_list):
         if topic_list == "all" or isinstance(topic_list, list):  # Fail early
-            if cls.available_topics is None:
+            if cls._available_topics is None:
                 cls.fetch_available_topics()
             if topic_list == "all":
-                return list(cls.available_topics.keys())
-            if all(t in cls.available_topics for t in topic_list):
+                return list(cls._available_topics.keys())
+            if all(t in cls._available_topics for t in topic_list):
                 return topic_list
         raise TopicsError(TopicsError.default_message)
 
     @classmethod
     def fetch_available_topics(cls):
-        if cls.available_topics is None:
+        if cls._available_topics is None:
             with requests.Session() as sess:
-                response = sess.get(cls.BASE_URL)
+                response = sess.get(cls._BASE_URL)
                 assert response.status_code == 200
             soup = utils.get_soup(response)
 
@@ -107,11 +107,11 @@ class Summarizer:
             topic_anchors = topics_div.find_all("a", "badge badge-light text-muted")
             assert topic_anchors  # TODO: consider raising helpful exceptions
 
-            cls.available_topics = {
-                anchor.text.strip(): urljoin(cls.BASE_URL, anchor.attrs["href"])
+            cls._available_topics = {
+                anchor.text.strip(): urljoin(cls._BASE_URL, anchor.attrs["href"])
                 for anchor in topic_anchors
             }
-        return list(cls.available_topics.keys())
+        return list(cls._available_topics.keys())
 
     def __del__(self):
         self.session.close()
@@ -137,7 +137,7 @@ class Topic:
             if not premium or self.summarizer.include_premium:
                 yield Tutorial(
                     title=title,
-                    url=urljoin(self.summarizer.BASE_URL, url),
+                    url=urljoin(self.summarizer._BASE_URL, url),
                     is_premium=premium,
                     date=date,
                     tags=tags,
@@ -160,7 +160,6 @@ class Tutorial:
         self.url = url
         self.is_premium = is_premium
         self.topic = topic  # Allows access to topic.summarizer.get_response
-        self.BASE_URL = self.topic.summarizer.BASE_URL  # alias to save typing
 
         self.markdown_title = f"## [{self.title}]({self.url})"
 
