@@ -17,7 +17,13 @@ Wouldn't it be nice if I could just skim over the introductions?
 
 ## Fetch introductions for all [Real Python][rp] articles
 
-This script depends on `requests`, `beautifulsoup4`, `html5lib`, and `html2markdown`, all of which can be installed via `pip`.
+This script depends on
+* `requests`,
+* `beautifulsoup4`,
+* `html5lib`,
+* `html2markdown`, and
+* `requests-cache`,
+all of which can be installed via `pip`.
 
 If you would like use this script, then clone the repo and run the following:
 
