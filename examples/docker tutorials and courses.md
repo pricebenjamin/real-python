@@ -1,11 +1,5 @@
 # docker tutorials and courses from Real Python
 
-## [Deploying Django on Dokku](https://realpython.com/deploying-a-django-app-on-dokku/)
-
-by [Real Python](https://realpython.com/) with tags: [advanced](https://realpython.com/tutorials/advanced/), [devops](https://realpython.com/tutorials/devops/), [django](https://realpython.com/tutorials/django/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([5 comments](https://realpython.com/deploying-a-django-app-on-dokku/#reader-comments))
-
-Originally written for _[Gun.io](http://www.gun.io)_, this post details how to use Dokku as a Heroku replacement for deploying your Django App.
-
 ## [How to Make a Twitter Bot in Python With Tweepy](https://realpython.com/twitter-bot-python-tweepy/)
 
 by [Miguel Garcia](https://realpython.com/twitter-bot-python-tweepy/#author) on Mon, 10 Jun 2019 with tags: [api](https://realpython.com/tutorials/api/), [docker](https://realpython.com/tutorials/docker/), [intermediate](https://realpython.com/tutorials/intermediate/) ([52 comments](https://realpython.com/twitter-bot-python-tweepy/#reader-comments))
@@ -56,15 +50,11 @@ We’ll be using the popular [cookiecutter-django](https://github.com/pydanny/co
 
 Let’s begin!
 
-## [Twitter Sentiment Analysis – Python, Docker, Elasticsearch, Kibana](https://realpython.com/twitter-sentiment-python-docker-elasticsearch-kibana/)
+## [Django Development with Docker Compose and Machine](https://realpython.com/django-development-with-docker-compose-and-machine/)
 
-by [Real Python](https://realpython.com/) with tags: [advanced](https://realpython.com/tutorials/advanced/), [api](https://realpython.com/tutorials/api/), [data-science](https://realpython.com/tutorials/data-science/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([61 comments](https://realpython.com/twitter-sentiment-python-docker-elasticsearch-kibana/#reader-comments))
+by [Real Python](https://realpython.com/django-development-with-docker-compose-and-machine/#team) with tags: [advanced](https://realpython.com/tutorials/advanced/), [devops](https://realpython.com/tutorials/devops/), [django](https://realpython.com/tutorials/django/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([199 comments](https://realpython.com/django-development-with-docker-compose-and-machine/#reader-comments))
 
-In this example, we’ll connect to the Twitter Streaming API, gather tweets (based on a keyword), [calculate the sentiment](https://realpython.com/python-keras-text-classification/) of each tweet, and build a real-time dashboard using the Elasticsearch DB and Kibana to visualize the results.
-
->  
-> Tools: [Docker](https://www.docker.com/) v1.3.0, [boot2docker](http://boot2docker.io/) v1.3.0, [Tweepy](http://www.tweepy.org/) v2.3.0, [TextBlob](http://textblob.readthedocs.org/en/dev/) v0.9.0, [Elasticsearch](http://www.elasticsearch.org/) v1.3.5, [Kibana](http://www.elasticsearch.org/overview/kibana/) v3.1.2
-> 
+[Docker](https://www.docker.com/) is a containerization tool used for spinning up isolated, reproducible application environments. __This piece details how to containerize a Django Project, Postgres, and Redis for local development along with delivering the stack to the cloud via [Docker Compose](https://docs.docker.com/compose/) and [Docker Machine](http://docs.docker.com/machine/).__
 
 ## [Dockerizing Flask With Compose and Machine – From Localhost to the Cloud](https://realpython.com/dockerizing-flask-with-compose-and-machine-from-localhost-to-the-cloud/)
 
@@ -83,12 +73,6 @@ _Updates:_
 > Interested in creating a similar environment for Django? Check out [this](https://realpython.com/django-development-with-docker-compose-and-machine/) blog post.
 > 
 
-## [Django Development with Docker Compose and Machine](https://realpython.com/django-development-with-docker-compose-and-machine/)
-
-by [Real Python](https://realpython.com/django-development-with-docker-compose-and-machine/#team) with tags: [advanced](https://realpython.com/tutorials/advanced/), [devops](https://realpython.com/tutorials/devops/), [django](https://realpython.com/tutorials/django/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([199 comments](https://realpython.com/django-development-with-docker-compose-and-machine/#reader-comments))
-
-[Docker](https://www.docker.com/) is a containerization tool used for spinning up isolated, reproducible application environments. __This piece details how to containerize a Django Project, Postgres, and Redis for local development along with delivering the stack to the cloud via [Docker Compose](https://docs.docker.com/compose/) and [Docker Machine](http://docs.docker.com/machine/).__
-
 ## [Docker in Action – Fitter, Happier, More Productive](https://realpython.com/docker-in-action-fitter-happier-more-productive/)
 
 by [Real Python](https://realpython.com/docker-in-action-fitter-happier-more-productive/#team) with tags: [devops](https://realpython.com/tutorials/devops/), [docker](https://realpython.com/tutorials/docker/), [flask](https://realpython.com/tutorials/flask/), [web-dev](https://realpython.com/tutorials/web-dev/) ([31 comments](https://realpython.com/docker-in-action-fitter-happier-more-productive/#reader-comments))
@@ -106,4 +90,20 @@ __We’ll start by creating a Docker container for running a Python Flask applic
 __Updated 04/04/2019__: Upgraded Docker (v18.09.2), Docker Compose (v1.23.2), Docker Machine (v0.16.1), Python (v3.7.3), and CircleCI (v2). Thanks [Florian Dahlitz](https://github.com/DahlitzFlorian)!
 
 __Updated 02/28/2015__: Added [Docker Compose](https://docs.docker.com/compose/) and upgraded Docker and boot2docker to the latest versions.
+
+## [Deploying Django on Dokku](https://realpython.com/deploying-a-django-app-on-dokku/)
+
+by [Real Python](https://realpython.com/) with tags: [advanced](https://realpython.com/tutorials/advanced/), [devops](https://realpython.com/tutorials/devops/), [django](https://realpython.com/tutorials/django/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([5 comments](https://realpython.com/deploying-a-django-app-on-dokku/#reader-comments))
+
+Originally written for _[Gun.io](http://www.gun.io)_, this post details how to use Dokku as a Heroku replacement for deploying your Django App.
+
+## [Twitter Sentiment Analysis – Python, Docker, Elasticsearch, Kibana](https://realpython.com/twitter-sentiment-python-docker-elasticsearch-kibana/)
+
+by [Real Python](https://realpython.com/) with tags: [advanced](https://realpython.com/tutorials/advanced/), [api](https://realpython.com/tutorials/api/), [data-science](https://realpython.com/tutorials/data-science/), [docker](https://realpython.com/tutorials/docker/), [web-dev](https://realpython.com/tutorials/web-dev/) ([61 comments](https://realpython.com/twitter-sentiment-python-docker-elasticsearch-kibana/#reader-comments))
+
+In this example, we’ll connect to the Twitter Streaming API, gather tweets (based on a keyword), [calculate the sentiment](https://realpython.com/python-keras-text-classification/) of each tweet, and build a real-time dashboard using the Elasticsearch DB and Kibana to visualize the results.
+
+>  
+> Tools: [Docker](https://www.docker.com/) v1.3.0, [boot2docker](http://boot2docker.io/) v1.3.0, [Tweepy](http://www.tweepy.org/) v2.3.0, [TextBlob](http://textblob.readthedocs.org/en/dev/) v0.9.0, [Elasticsearch](http://www.elasticsearch.org/) v1.3.5, [Kibana](http://www.elasticsearch.org/overview/kibana/) v3.1.2
+> 
 

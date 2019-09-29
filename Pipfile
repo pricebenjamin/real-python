@@ -12,9 +12,9 @@ pre-commit = "*"
 [packages]
 requests = "*"
 beautifulsoup4 = "*"
-html5lib = "*"
 html2markdown = "*"
 requests-cache = "*"
+lxml = "*"
 
 [requires]
 python_version = "3.7"

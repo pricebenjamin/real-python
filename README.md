@@ -20,7 +20,7 @@ Wouldn't it be nice if I could just skim over the introductions?
 This script depends on
 * `requests`,
 * `beautifulsoup4`,
-* `html5lib`,
+* `lxml`,
 * `html2markdown`, and
 * `requests-cache`,
 all of which can be installed via `pip`.

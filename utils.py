@@ -10,9 +10,18 @@ from typing import List, Generator
 # Local imports
 from exceptions import CommentCountError
 
+soup_cache = {}
+
 
 def get_soup(response):
-    return bs4.BeautifulSoup(response.content, "html5lib")
+    global soup_cache
+    url = response.url
+    if url not in soup_cache:
+        soup = bs4.BeautifulSoup(response.content, "lxml")
+        soup_cache[url] = soup
+    else:
+        soup = soup_cache[url]
+    return soup
 
 
 def sleep_for(count):

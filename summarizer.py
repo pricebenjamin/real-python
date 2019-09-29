@@ -168,15 +168,15 @@ class Topic:
             else:
                 cards = utils.get_cards(self.soup)
 
-            available_cards = set(cards)
-            new_cards = available_cards - visited_cards
+            found_new_cards = False
+            for card in cards:
+                if card not in visited_cards:
+                    found_new_cards = True
+                    visited_cards.add(card)
+                    yield card
 
-            if not new_cards:
+            if not found_new_cards:
                 break
-
-            for card in new_cards:
-                visited_cards.add(card)
-                yield card
 
 
 class Tutorial:
