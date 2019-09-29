@@ -114,7 +114,8 @@ class Summarizer:
         return list(cls._available_topics.keys())
 
     def __del__(self):
-        self.session.close()
+        if hasattr(self, "session"):
+            self.session.close()
 
 
 class Topic:
