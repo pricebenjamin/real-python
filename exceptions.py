@@ -20,6 +20,8 @@ class TopicsError(Error):
             (1) a list of valid topic strings OR
             (2) the string "all"
 
+        Received: {!r}
+
         A list of valid topics can be obtained with
 
             Summarizer.fetch_available_topics()

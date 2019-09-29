@@ -91,7 +91,7 @@ class Summarizer:
                 return list(cls._available_topics.keys())
             if all(t in cls._available_topics for t in topic_list):
                 return topic_list
-        raise TopicsError(TopicsError.default_message)
+        raise TopicsError(TopicsError.default_message.format(topic_list))
 
     @classmethod
     def fetch_available_topics(cls):
