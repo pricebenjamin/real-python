@@ -2,24 +2,26 @@ import bs4
 import html2markdown
 import itertools
 import os
+import re
 import requests
 import requests_cache
+import time
 
 from bs4.element import NavigableString, Tag
 from collections import namedtuple
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Generator
 from urllib.parse import urljoin
 
 # Local imports
-import utils
-from exceptions import UnsuccessfulGet, TopicsError
+from exceptions import UnsuccessfulGet, TopicsError, CommentCountError
 
 
 Author = namedtuple("Author", "name url")
 Date = datetime
 Tag = namedtuple("Tag", "name url")
 Comments = namedtuple("Comments", "count url")
+Card = namedtuple("Card", "title url is_premium date tags")
 
 
 REQUESTS_CACHE_FILE = "requests_cache"
@@ -73,7 +75,7 @@ class Summarizer:
                 count = int(retry_after)
             except ValueError:
                 count = 10
-            utils.sleep_for(count)  # TODO: implement more robust rate-limiting
+            sleep_for(count)  # TODO: implement more robust rate-limiting
             return self.get_response(url)
         else:
             print("Error: unsuccessful get")
@@ -99,7 +101,7 @@ class Summarizer:
             with requests.Session() as sess:
                 response = sess.get(cls._BASE_URL)
                 assert response.status_code == 200
-            soup = utils.get_soup(response)
+            soup = get_soup(response)
 
             topics_div = soup.find("div", "sidebar-module sidebar-module-inset border")
             assert topics_div  # TODO: consider raising helpful exceptions
@@ -137,7 +139,7 @@ class Topic:
                     url=urljoin(self.summarizer._BASE_URL, card.url),
                     is_premium=card.is_premium,
                     date=card.date,
-                    tags=card.topic_tags,
+                    tags=card.tags,
                     topic=self,
                 )
 
@@ -145,7 +147,7 @@ class Topic:
     def soup(self):
         if self._soup is None:
             resp = self.summarizer.get_response(self.url)
-            self._soup = utils.get_soup(resp)
+            self._soup = get_soup(resp)
         assert self._soup
         return self._soup
 
@@ -154,7 +156,7 @@ class Topic:
         return self.card_generator()
 
     def card_generator(self):
-        multipaged = utils.has_multiple_pages(self.soup)
+        multipaged = has_multiple_pages(self.soup)
 
         visited_cards = set()
         pages = itertools.count(start=1) if multipaged else [1]
@@ -163,10 +165,15 @@ class Topic:
             if multipaged and page > 1:
                 url = urljoin(self.url, f"page/{page}/")
                 resp = self.summarizer.get_response(url)
-                soup = utils.get_soup(resp)
-                cards = utils.get_cards(soup)
+                soup = get_soup(resp)
+                cards = get_cards(soup, self.url)
             else:
-                cards = utils.get_cards(self.soup)
+                cards = get_cards(self.soup, self.url)
+
+            # Set difference was previously used to determine new cards (e.g.,
+            #     new_cards = set(cards) - visited_cards
+            # ), but this produced non-deterministic output. The following
+            # approach was adopted instead.
 
             found_new_cards = False
             for card in cards:
@@ -186,7 +193,7 @@ class Tutorial:
         url: str,
         is_premium: bool,
         date: Optional[datetime],
-        tags: Optional[Tuple[bs4.element.Tag]],
+        tags: Tuple[Tag],
         topic: Topic,
     ):
         # Already known attributes
@@ -204,13 +211,9 @@ class Tutorial:
             self._has_date = False
             self._date = None
 
-        # Partially determined properties
-        if tags is not None:
-            self._has_tags = True
-            self._raw_tags = tags
-        else:
-            self._has_tags = False
-        self._tags = None
+        assert tags
+        self._has_tags = True
+        self._tags = tags
 
         # Lazily determined properties
         self._soup = None
@@ -230,7 +233,7 @@ class Tutorial:
     def soup(self):
         if self._soup is None:
             response = self.topic.summarizer.get_response(self.url)
-            self._soup = utils.get_soup(response)
+            self._soup = get_soup(response)
         assert self._soup
         return self._soup
 
@@ -291,15 +294,7 @@ class Tutorial:
 
     @property
     def tags(self):
-        if self._has_tags:
-            if self._tags is None:
-                # Generate list of tags from _raw_tags
-                self._tags = [
-                    Tag(name=tag.text, url=urljoin(self.url, tag.attrs["href"]))
-                    for tag in self._raw_tags
-                ]
-            return self._tags
-        raise AttributeError(f"{self!s} does not have any tags")
+        return self._tags
 
     @property
     def has_comments(self):
@@ -320,11 +315,11 @@ class Tutorial:
             if self._comments is None:
                 comments = self.metadata_element.find("a", {"href": "#reader-comments"})
                 disqus = self.metadata_element.find("span", "disqus-comment-count")
-                query_url = utils.generate_count_query_url(
+                query_url = generate_count_query_url(
                     disqus.attrs["data-disqus-identifier"]
                 )
                 response = self.topic.summarizer.get_response(query_url)
-                count = utils.extract_comment_count(response)
+                count = extract_comment_count(response)
                 url = urljoin(self.url, comments.attrs["href"])
                 self._comments = Comments(count, url)
             return self._comments
@@ -424,3 +419,89 @@ class Tutorial:
     def __repr__(self):
         cls = type(self).__name__
         return f"{cls}(title={self.title!r}, url={self.url!r})"
+
+
+# Helper functions
+soup_cache = {}
+
+
+def get_soup(response):
+    global soup_cache
+    url = response.url
+    if url not in soup_cache:
+        soup = bs4.BeautifulSoup(response.content, "lxml")
+        soup_cache[url] = soup
+    else:
+        soup = soup_cache[url]
+    return soup
+
+
+def sleep_for(count):
+    for i in range(count, 0, -1):
+        msg = f"    Sleeping for {i} more second{'s' if i != 1 else ''}..."
+        msg = f"{msg: <40}"
+        # https://docs.python.org/3/library/string.html#format-examples
+        print(msg, end="\r")
+        time.sleep(1)
+    print()
+
+
+def get_cards(soup: bs4.BeautifulSoup, url: str) -> Generator[Card, None, None]:
+    tags = soup.find_all("div", "card border-0")
+    for tag in tags:
+        yield build_card_from_tag(tag, url)
+
+
+date_re = re.compile(r"([A-Za-z]{3} \d+, \d{4})")
+
+
+def build_card_from_tag(bs4_tag: bs4.element.Tag, base_url: str) -> Card:
+    title = bs4_tag.find("h2", "card-title").text.strip()
+    assert title
+
+    tutorial_url = bs4_tag.find("a").get("href")
+    assert tutorial_url
+    tutorial_url = urljoin(base_url, tutorial_url)
+
+    is_premium = bool(bs4_tag.find("a", {"href": "/account/join/"}))
+
+    match = date_re.search(bs4_tag.text)
+    date = datetime.strptime(match.group(0), "%b %d, %Y") if match else None
+
+    tutorial_tags = bs4_tag.find_all("a", "badge badge-light text-muted")
+    assert tutorial_tags  # Every article should have tags
+    tutorial_tags = tuple(
+        Tag(name=tag.text, url=urljoin(base_url, tag.attrs["href"]))
+        for tag in tutorial_tags
+    )
+
+    return Card(title, tutorial_url, is_premium, date, tutorial_tags)
+
+
+def generate_count_query_url(article_url):
+    # Real Python uses a disqus query to count comments on a given article
+    disqus_url = "https://realpython.disqus.com/count-data.js"
+    return disqus_url + "?1=" + requests.utils.quote(article_url, safe="")
+
+
+# Compile regular expression for searching disqus count query response
+count_query_response_re = re.compile(r'"comments":(\d+)')
+
+
+def extract_comment_count(disqus_response) -> int:
+    match = count_query_response_re.search(disqus_response.text)
+    if match:
+        count, = match.groups()
+        count = int(count)
+    else:
+        msg = (
+            f"Failed to parse comment count query response;\n\n"
+            f"regexp == {count_query_response_re!r}\n\n"
+            f"disqus_response.text == {disqus_response.text!r}"
+        )
+        raise CommentCountError(msg)
+    return count
+
+
+def has_multiple_pages(soup) -> bool:
+    return bool(soup.find("nav", {"aria-label": "Page Navigation"}))
