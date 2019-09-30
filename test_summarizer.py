@@ -1,5 +1,4 @@
 import os
-from operator import attrgetter
 
 # Local imports
 from summarizer import Summarizer
@@ -7,30 +6,38 @@ from summarizer import Summarizer
 if __name__ == "__main__":
 
     s = Summarizer(
-        selected_topics=["advanced"],
-        include_premium=False,
-        output_dir="advanced_tutorials",
+        include_premium=False,  # Do not include premium content
+        output_dir="advanced_ml_tutorials",  # Specify output directory
     )
 
-    for topic in s.topics:
-        filename = f"{topic.name} tutorials.md"
-        path = os.path.join(s.output_dir, filename)
+    selected_tutorials = [
+        tutorial
+        for topic in s.topics  # Iterate over all topics
+        for tutorial in topic.tutorials  # Iterate over all tutorials within the topic
+        if "advanced" in tutorial.tag_names  # Check that tutorial is tagged `advanced`
+        and "machine-learning"
+        in tutorial.tag_names  # and also tagged `machine-learning`
+    ]
 
-        tutorials = sorted(
-            (t for t in topic.tutorials if t.has_comments),  # Filter tutorials
-            key=attrgetter("comments.count"),  # Sort by # comments
-            reverse=True,
-        )
+    # Check that we've found tutorials matching our criteria
+    assert len(selected_tutorials) > 0
 
-        # Check that we've found tutorials matching our criteria
-        assert len(tutorials) > 0
+    filename = "advanced_ml_tutorials.md"
+    path = os.path.join(s.output_dir, filename)
 
-        print(f"\nWriting file `{path}`\n")
+    print(f"\nWriting file `{path}`\n")
 
-        with open(path, "w") as f:
-            f.write(f"# {topic.name} tutorials from Real Python" + "\n\n")
-            for tutorial in tutorials:
-                f.write(tutorial.markdown_title + "\n\n")
-                if tutorial.has_metadata_string:
-                    f.write(tutorial.markdown_metadata_string + "\n\n")
-                f.write(tutorial.markdown_introduction + "\n\n")
+    with open(path, "w") as f:
+        # Main title for the output
+        f.write(f"# Advanced ML tutorials from Real Python" + "\n\n")
+
+        for tutorial in selected_tutorials:
+            # Title of the tutorial
+            f.write(tutorial.markdown_title + "\n\n")
+
+            # Include author, date, tags, and comments, if available
+            if tutorial.has_metadata_string:
+                f.write(tutorial.markdown_metadata_string + "\n\n")
+
+            # Write first few paragraphs of the tutorial
+            f.write(tutorial.markdown_introduction + "\n\n")

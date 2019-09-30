@@ -214,6 +214,7 @@ class Tutorial:
         assert tags
         self._has_tags = True
         self._tags = tags
+        self._tag_names = tuple(tag.name for tag in self._tags)
 
         # Lazily determined properties
         self._soup = None
@@ -295,6 +296,10 @@ class Tutorial:
     @property
     def tags(self):
         return self._tags
+
+    @property
+    def tag_names(self):
+        return self._tag_names
 
     @property
     def has_comments(self):
